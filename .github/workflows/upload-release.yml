@@ -1,0 +1,42 @@
+name: ESP32 Multi-Platform Build and FTP Upload
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build-and-upload:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install ESP-IDF
+      run: |
+        mkdir -p ~/esp
+        cd ~/esp
+        git clone --recursive https://github.com/espressif/esp-idf.git
+        cd esp-idf
+        ./install.sh
+        . ./export.sh
+
+    - name: Build project
+      run: |
+        . $HOME/esp/esp-idf/export.sh
+        idf.py build
+
+    - name: Upload to FTP
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./build
+        server-dir: ${{ secrets.FTP_LOCATION }}
