@@ -17,3 +17,6 @@ dependencies:
     git: https://github.com/RoboticsBrno/Esp32-DCMotor.git
     version: v1.0.1
     path: lib
+  ESP32-HUB75-MatrixPanel-DMA:
+    git: https://github.com/mrcodetastic/ESP32-HUB75-MatrixPanel-DMA.git
+    version: 3.0.13
