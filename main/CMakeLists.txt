@@ -6,7 +6,6 @@ idf_component_register(
         "espFeatures/renderer/rendererFeature.cpp"
         "espFeatures/renderer/src/Texture.cpp"
         "espFeatures/renderer/src/Font.cpp"
-        "espFeatures/renderer/src/Profiler.cpp"
         "espFeatures/renderer/src/Renderer.cpp"
         "espFeatures/renderer/src/Shapes/Collection.cpp"
         "espFeatures/renderer/src/Shapes/Rectangle.cpp"

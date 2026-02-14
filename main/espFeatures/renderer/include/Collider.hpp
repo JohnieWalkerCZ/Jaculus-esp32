@@ -43,7 +43,7 @@ class Collider : public Collidable {
     float x;
     float y;
 
-    Collider(int x, int y) : x(x), y(y) {}
+    Collider(float x, float y) : x(x), y(y) {}
     virtual ~Collider() = default;
 
     virtual bool intersects(const Collider *other) const = 0;

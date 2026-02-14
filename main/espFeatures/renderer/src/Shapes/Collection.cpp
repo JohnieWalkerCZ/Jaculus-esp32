@@ -5,8 +5,9 @@ Collection::Collection(const ShapeParams &params) : Shape(params) {}
 
 Collection::~Collection() {
     for (auto shape : shapes) {
-        delete shape;
+        shape->setParent(nullptr);
     }
+    shapes.clear();
 }
 
 Collider *Collection::defaultCollider() { return new CircleCollider(0, 0, 0); }
@@ -35,3 +36,5 @@ void Collection::drawAliased(Pixels &pixels) {
         shape->drawAliased(pixels);
     }
 }
+
+void Collection::clear() { shapes.clear(); }

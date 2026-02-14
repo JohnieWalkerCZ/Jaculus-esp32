@@ -14,9 +14,11 @@ Shape::Shape(const ShapeParams &params)
 }
 
 Shape::~Shape() {
+    /*
     if (collider) {
         delete collider;
     }
+    */
 }
 
 // Cache management
@@ -44,7 +46,6 @@ void Shape::addCollider(Collider *collider) {
         this->collider = collider;
         return;
     }
-    jac::Logger::debug("Shape: Adding default collider");
     this->collider = defaultCollider();
 }
 

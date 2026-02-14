@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Profiler.hpp"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
 #include "include/Font/Font.hpp"
@@ -539,6 +538,16 @@ class CollectionProtoBuilder : public jac::ProtoBuilder::Opaque<Collection>,
                 if (shape) {
                     collection.addShape(shape);
                 }
+            }),
+            jac::PropFlags::Enumerable);
+        proto.defineProperty(
+            "clear",
+            ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisVal) {
+                auto *collection = getOpaque(ctx, thisVal);
+                if (collection) {
+                    collection->clear();
+                }
+                return jac::Value::undefined(ctx);
             }),
             jac::PropFlags::Enumerable);
     }

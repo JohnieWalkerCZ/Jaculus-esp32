@@ -15,4 +15,5 @@ class Collection : public Shape {
     std::vector<Shape *> getShapes() { return shapes; }
     void drawAntiAliased(Pixels &pixels) override;
     void drawAliased(Pixels &pixels) override;
+    void clear();
 };

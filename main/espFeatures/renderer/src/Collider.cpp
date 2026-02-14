@@ -1,6 +1,7 @@
 #include "Collider.hpp"
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 bool IntersectionVisitor::visitCircle(const CircleCollider *circle) {
     switch (other->getType()) {
@@ -118,7 +119,8 @@ bool IntersectionVisitor::visitPoint(const PointCollider *point) {
 
 bool IntersectionVisitor::visitRegularPolygon(
     const RegularPolygonCollider *regularPolygon) {
-    CircleCollider circle(static_cast<int>(regularPolygon->x), static_cast<int>(regularPolygon->y),
+    CircleCollider circle(static_cast<int>(regularPolygon->x),
+                          static_cast<int>(regularPolygon->y),
                           regularPolygon->radius);
     IntersectionVisitor circleVisitor(&circle);
     return other->accept(&circleVisitor);
@@ -134,20 +136,30 @@ bool IntersectionVisitor::circleCircle(const CircleCollider *c1,
 
 bool IntersectionVisitor::circleRectangle(const CircleCollider *circle,
                                           const RectangleCollider *rect) {
-    int closestX =
-        std::max(static_cast<int>(rect->x), std::min(static_cast<int>(circle->x), static_cast<int>(rect->x + rect->width)));
-    int closestY =
-        std::max(static_cast<int>(rect->y), std::min(static_cast<int>(circle->y), static_cast<int>(rect->y + rect->height)));
-    float distanceSquared = CollisionMath::distanceSquared(circle->x, circle->y,
-                                                           closestX, closestY);
-    return distanceSquared <= (circle->radius * circle->radius);
-}
+    float testX = circle->x;
+    float testY = circle->y;
 
+    if (circle->x < rect->x)
+        testX = rect->x;
+    else if (circle->x > rect->x + rect->width)
+        testX = rect->x + rect->width;
+
+    if (circle->y < rect->y)
+        testY = rect->y;
+    else if (circle->y > rect->y + rect->height)
+        testY = rect->y + rect->height;
+
+    float distX = circle->x - testX;
+    float distY = circle->y - testY;
+    float distance = sqrt((distX * distX) + (distY * distY));
+
+    return distance <= circle->radius;
+}
 bool IntersectionVisitor::circlePoint(const CircleCollider *circle,
                                       const PointCollider *point) {
     float distanceSquared = CollisionMath::distanceSquared(circle->x, circle->y,
                                                            point->x, point->y);
-    return distanceSquared < (circle->radius * circle->radius);
+    return distanceSquared <= (circle->radius * circle->radius);
 }
 
 bool IntersectionVisitor::circleLine(const CircleCollider *circle,
@@ -156,7 +168,8 @@ bool IntersectionVisitor::circleLine(const CircleCollider *circle,
                                  (line->y2 - line->y) * (line->y2 - line->y));
 
     if (lineLength == 0) {
-        PointCollider tempPoint(static_cast<int>(line->x), static_cast<int>(line->y));
+        PointCollider tempPoint(static_cast<int>(line->x),
+                                static_cast<int>(line->y));
         return circlePoint(circle, &tempPoint);
     }
 
@@ -198,17 +211,24 @@ bool IntersectionVisitor::circlePolygon(const CircleCollider *circle,
 bool IntersectionVisitor::circleRegularPolygon(
     const CircleCollider *circle,
     const RegularPolygonCollider *regularPolygon) {
-    CircleCollider otherCircle(static_cast<int>(regularPolygon->x), static_cast<int>(regularPolygon->y),
+    CircleCollider otherCircle(static_cast<int>(regularPolygon->x),
+                               static_cast<int>(regularPolygon->y),
                                regularPolygon->radius);
     return circleCircle(circle, &otherCircle);
 }
 
 bool IntersectionVisitor::rectangleRectangle(const RectangleCollider *r1,
                                              const RectangleCollider *r2) {
-    return !(r1->x >= r2->x + r2->width || r1->x + r1->width <= r2->x ||
-             r1->y >= r2->y + r2->height || r1->y + r1->height <= r2->y);
-}
+    int r1x = static_cast<int>(r1->x);
+    int r1y = static_cast<int>(r1->y);
+    int r2x = static_cast<int>(r2->x);
+    int r2y = static_cast<int>(r2->y);
 
+    return !(r1x >= r2x + r2->width ||  // R1 is right of R2
+             r1x + r1->width <= r2x ||  // R1 is left of R2
+             r1y >= r2y + r2->height || // R1 is below R2
+             r1y + r1->height <= r2y);  // R1 is above R2
+}
 bool IntersectionVisitor::rectanglePoint(const RectangleCollider *rect,
                                          const PointCollider *point) {
     return point->x >= rect->x && point->x <= rect->x + rect->width &&
@@ -217,18 +237,26 @@ bool IntersectionVisitor::rectanglePoint(const RectangleCollider *rect,
 
 bool IntersectionVisitor::rectangleLine(const RectangleCollider *rect,
                                         const LineSegmentCollider *line) {
-    PointCollider startPoint(static_cast<int>(line->x), static_cast<int>(line->y));
-    PointCollider endPoint(static_cast<int>(line->x2), static_cast<int>(line->y2));
+    PointCollider startPoint(static_cast<int>(line->x),
+                             static_cast<int>(line->y));
+    PointCollider endPoint(static_cast<int>(line->x2),
+                           static_cast<int>(line->y2));
 
     if (rectanglePoint(rect, &startPoint) || rectanglePoint(rect, &endPoint)) {
         return true;
     }
 
     LineSegmentCollider edges[4] = {
-        {static_cast<int>(rect->x), static_cast<int>(rect->y), static_cast<int>(rect->x + rect->width), static_cast<int>(rect->y)},
-        {static_cast<int>(rect->x + rect->width), static_cast<int>(rect->y), static_cast<int>(rect->x + rect->width), static_cast<int>(rect->y + rect->height)},
-        {static_cast<int>(rect->x + rect->width), static_cast<int>(rect->y + rect->height), static_cast<int>(rect->x), static_cast<int>(rect->y + rect->height)},
-        {static_cast<int>(rect->x), static_cast<int>(rect->y + rect->height), static_cast<int>(rect->x), static_cast<int>(rect->y)}};
+        {static_cast<int>(rect->x), static_cast<int>(rect->y),
+         static_cast<int>(rect->x + rect->width), static_cast<int>(rect->y)},
+        {static_cast<int>(rect->x + rect->width), static_cast<int>(rect->y),
+         static_cast<int>(rect->x + rect->width),
+         static_cast<int>(rect->y + rect->height)},
+        {static_cast<int>(rect->x + rect->width),
+         static_cast<int>(rect->y + rect->height), static_cast<int>(rect->x),
+         static_cast<int>(rect->y + rect->height)},
+        {static_cast<int>(rect->x), static_cast<int>(rect->y + rect->height),
+         static_cast<int>(rect->x), static_cast<int>(rect->y)}};
 
     for (int i = 0; i < 4; i++) {
         if (lineLine(line, &edges[i])) {
@@ -252,10 +280,12 @@ bool IntersectionVisitor::rectanglePolygon(const RectangleCollider *rect,
         }
     }
 
-    PointCollider corners[4] = {{static_cast<int>(rect->x), static_cast<int>(rect->y)},
-                                {static_cast<int>(rect->x + rect->width), static_cast<int>(rect->y)},
-                                {static_cast<int>(rect->x + rect->width), static_cast<int>(rect->y + rect->height)},
-                                {static_cast<int>(rect->x), static_cast<int>(rect->y + rect->height)}};
+    PointCollider corners[4] = {
+        {static_cast<int>(rect->x), static_cast<int>(rect->y)},
+        {static_cast<int>(rect->x + rect->width), static_cast<int>(rect->y)},
+        {static_cast<int>(rect->x + rect->width),
+         static_cast<int>(rect->y + rect->height)},
+        {static_cast<int>(rect->x), static_cast<int>(rect->y + rect->height)}};
 
     for (int i = 0; i < 4; i++) {
         if (CollisionMath::pointInPolygon(corners[i].x, corners[i].y,
@@ -265,10 +295,16 @@ bool IntersectionVisitor::rectanglePolygon(const RectangleCollider *rect,
     }
 
     LineSegmentCollider rectEdges[4] = {
-        {static_cast<int>(rect->x), static_cast<int>(rect->y), static_cast<int>(rect->x + rect->width), static_cast<int>(rect->y)},
-        {static_cast<int>(rect->x + rect->width), static_cast<int>(rect->y), static_cast<int>(rect->x + rect->width), static_cast<int>(rect->y + rect->height)},
-        {static_cast<int>(rect->x + rect->width), static_cast<int>(rect->y + rect->height), static_cast<int>(rect->x), static_cast<int>(rect->y + rect->height)},
-        {static_cast<int>(rect->x), static_cast<int>(rect->y + rect->height), static_cast<int>(rect->x), static_cast<int>(rect->y)}};
+        {static_cast<int>(rect->x), static_cast<int>(rect->y),
+         static_cast<int>(rect->x + rect->width), static_cast<int>(rect->y)},
+        {static_cast<int>(rect->x + rect->width), static_cast<int>(rect->y),
+         static_cast<int>(rect->x + rect->width),
+         static_cast<int>(rect->y + rect->height)},
+        {static_cast<int>(rect->x + rect->width),
+         static_cast<int>(rect->y + rect->height), static_cast<int>(rect->x),
+         static_cast<int>(rect->y + rect->height)},
+        {static_cast<int>(rect->x), static_cast<int>(rect->y + rect->height),
+         static_cast<int>(rect->x), static_cast<int>(rect->y)}};
 
     for (size_t i = 0; i < worldPoints.size(); i++) {
         size_t j = (i + 1) % worldPoints.size();
@@ -289,7 +325,8 @@ bool IntersectionVisitor::rectanglePolygon(const RectangleCollider *rect,
 bool IntersectionVisitor::rectangleRegularPolygon(
     const RectangleCollider *rect,
     const RegularPolygonCollider *regularPolygon) {
-    CircleCollider circle(static_cast<int>(regularPolygon->x), static_cast<int>(regularPolygon->y),
+    CircleCollider circle(static_cast<int>(regularPolygon->x),
+                          static_cast<int>(regularPolygon->y),
                           regularPolygon->radius);
     return circleRectangle(&circle, rect);
 }
@@ -308,8 +345,10 @@ bool IntersectionVisitor::polygonLine(const PolygonCollider *polygon,
     std::vector<std::pair<int, int>> pointsVec(worldPoints.begin(),
                                                worldPoints.end());
 
-    PointCollider startPoint(static_cast<int>(line->x), static_cast<int>(line->y));
-    PointCollider endPoint(static_cast<int>(line->x2), static_cast<int>(line->y2));
+    PointCollider startPoint(static_cast<int>(line->x),
+                             static_cast<int>(line->y));
+    PointCollider endPoint(static_cast<int>(line->x2),
+                           static_cast<int>(line->y2));
 
     if (polygonPoint(polygon, &startPoint) ||
         polygonPoint(polygon, &endPoint)) {
@@ -374,7 +413,8 @@ bool IntersectionVisitor::polygonPolygon(const PolygonCollider *p1,
 bool IntersectionVisitor::polygonRegularPolygon(
     const PolygonCollider *polygon,
     const RegularPolygonCollider *regularPolygon) {
-    CircleCollider circle(static_cast<int>(regularPolygon->x), static_cast<int>(regularPolygon->y),
+    CircleCollider circle(static_cast<int>(regularPolygon->x),
+                          static_cast<int>(regularPolygon->y),
                           regularPolygon->radius);
     return circlePolygon(&circle, polygon);
 }
@@ -405,7 +445,8 @@ bool IntersectionVisitor::lineLine(const LineSegmentCollider *l1,
 bool IntersectionVisitor::lineRegularPolygon(
     const LineSegmentCollider *line,
     const RegularPolygonCollider *regularPolygon) {
-    CircleCollider circle(static_cast<int>(regularPolygon->x), static_cast<int>(regularPolygon->y),
+    CircleCollider circle(static_cast<int>(regularPolygon->x),
+                          static_cast<int>(regularPolygon->y),
                           regularPolygon->radius);
     return circleLine(&circle, line);
 }
@@ -417,7 +458,8 @@ bool IntersectionVisitor::pointPoint(const PointCollider *p1,
 
 bool IntersectionVisitor::pointRegularPolygon(
     const PointCollider *point, const RegularPolygonCollider *regularPolygon) {
-    CircleCollider circle(static_cast<int>(regularPolygon->x), static_cast<int>(regularPolygon->y),
+    CircleCollider circle(static_cast<int>(regularPolygon->x),
+                          static_cast<int>(regularPolygon->y),
                           regularPolygon->radius);
     return circlePoint(&circle, point);
 }
