@@ -22,6 +22,7 @@
 #include "espFeatures/gridui/gridUiFeature.h"
 #include "espFeatures/hub75/hub75Feature.h"
 #include "espFeatures/i2cFeature.h"
+#include "espFeatures/spiFeature.h"
 #include "espFeatures/ledcFeature.h"
 #include "espFeatures/motorFeature.h"
 #include "espFeatures/pulseCounterFeature.h"
@@ -32,6 +33,7 @@
 #include "espFeatures/timestampFeature.h"
 #include "espFeatures/udpSocketFeature.h"
 #include "espFeatures/wifiFeature.h"
+#include "espFeatures/convertFeature.h"
 
 #include "platform/espNvsKeyValue.h"
 #include "platform/espWifi.h"
@@ -70,14 +72,36 @@
 wl_handle_t storage_wl_handle = WL_INVALID_HANDLE;
 
 using Machine = jac::ComposeMachine<
-    jac::MachineBase, FreeRTOSEventQueueFeature, jac::BasicStreamFeature,
-    jac::StdioFeature, PlatformInfoFeature, jac::EventLoopFeature,
-    jac::FilesystemFeature, jac::ModuleLoaderFeature, jac::TimersFeature,
-    TimestampFeature, ExtendLifetimeFeature, GpioFeature, LedcFeature,
-    AdcFeature, I2CFeature, SmartLedFeature, PulseCounterFeature,
-    SimpleRadioFeature, MotorFeature, WifiFeature, GridUiFeature,
-    RendererFeature, Hub75Feature, jac::KeyValueFeature, SelectFeature,
-    UdpSocketFeature, jac::EventLoopTerminal>;
+    jac::MachineBase,
+    FreeRTOSEventQueueFeature,
+    jac::BasicStreamFeature,
+    jac::StdioFeature,
+    PlatformInfoFeature,
+    jac::EventLoopFeature,
+    jac::FilesystemFeature,
+    jac::ModuleLoaderFeature,
+    jac::TimersFeature,
+    TimestampFeature,
+    ExtendLifetimeFeature,
+    ConvertFeature,
+    GpioFeature,
+    LedcFeature,
+    AdcFeature,
+    I2CFeature,
+    SPIFeature,
+    SmartLedFeature,
+    PulseCounterFeature,
+    SimpleRadioFeature,
+    MotorFeature,
+    WifiFeature,
+    GridUiFeature,
+    RendererFeature,
+    Hub75Feature,
+    jac::KeyValueFeature,
+    SelectFeature,
+    UdpSocketFeature,
+    jac::EventLoopTerminal
+>;
 
 jac::Device<Machine> device(
     "/data",
