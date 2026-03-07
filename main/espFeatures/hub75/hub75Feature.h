@@ -2,13 +2,10 @@
 
 #include "../renderer/rendererFeature.h"
 #include "ESP32-HUB75-MatrixPanel-I2S-DMA.h"
-#include "driver/gpio.h" // Added for gpio_reset_pin
+#include "driver/gpio.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "jac/device/logger.h"
-#include "types.h"
 #include <cstdint>
 #include <cstring>
 #include <format>
@@ -17,6 +14,9 @@
 #include <jac/machine/machine.h>
 #include <jac/machine/values.h>
 #include <vector>
+#include "Utils.hpp"
+
+static MatrixPanel_I2S_DMA *s_display = nullptr;
 
 template <class Next> class Hub75Feature;
 
@@ -26,6 +26,7 @@ class Hub75Holder {
 
   private:
     MatrixPanel_I2S_DMA *display;
+
     Color *m_previousBuffer;
     Color *m_current_frame_buffer;
     uint8_t *m_pixel_is_set;
@@ -37,6 +38,7 @@ class Hub75Holder {
     bool m_initialized;
 
     static const char *TAG;
+
     HUB75_I2S_CFG::i2s_pins getDefaultPins() {
         return {.r1 = 4,
                 .g1 = 5,
@@ -58,45 +60,80 @@ class Hub75Holder {
         return x >= 0 && x < m_width && y >= 0 && y < m_height;
     }
 
-    // NEW: Helper to forcibly detach pins from stuck DMA channels
-    void forceResetPins() {
-        int pins[] = {4, 5, 6, 7, 15, 16, 18, 8, 10, 42, 17, 47, 2, 48};
-        for (int p : pins) {
-            gpio_reset_pin((gpio_num_t)p);
+  public:
+    Hub75Holder(int panelWidth, int panelHeight, int chainLength)
+        : display(nullptr), m_previousBuffer(nullptr),
+          m_current_frame_buffer(nullptr), m_pixel_is_set(nullptr),
+          m_initialized(false) {
+
+        active_instance = this;
+
+        m_width = panelWidth * chainLength;
+        m_height = panelHeight;
+        m_chain_length = chainLength;
+        m_buffer_count = m_width * m_height;
+    }
+
+    ~Hub75Holder() {
+        if (m_current_frame_buffer)
+            heap_caps_free(m_current_frame_buffer);
+        if (m_previousBuffer)
+            heap_caps_free(m_previousBuffer);
+        if (m_pixel_is_set)
+            heap_caps_free(m_pixel_is_set);
+
+        if (active_instance == this) {
+            active_instance = nullptr;
         }
     }
 
-    void init_task() {
-        jac::Logger::debug("Hub75Holder: init_task started");
+    void start() {
+        if (s_display != nullptr) {
+            jac::Logger::debug("Hub75Holder: Soft-Reload detected. Hardware "
+                               "requires clean state.");
+            jac::Logger::debug("Hub75Holder: Rebooting device...");
 
-        // 1. Force Clean Pins
-        // This ensures no previous peripheral configuration is holding the pins
-        forceResetPins();
+            vTaskDelay(pdMS_TO_TICKS(100));
+            esp_restart();
+
+            while (true)
+                vTaskDelay(100);
+        }
+
+        jac::Logger::debug("Hub75Holder: Starting Fresh Initialization...");
+
+        if (m_previousBuffer) {
+            heap_caps_free(m_previousBuffer);
+            m_previousBuffer = nullptr;
+        }
+        if (m_current_frame_buffer) {
+            heap_caps_free(m_current_frame_buffer);
+            m_current_frame_buffer = nullptr;
+        }
+        if (m_pixel_is_set) {
+            heap_caps_free(m_pixel_is_set);
+            m_pixel_is_set = nullptr;
+        }
+
+        m_initialized = false;
 
         HUB75_I2S_CFG mxconfig(m_width / m_chain_length, m_height,
                                m_chain_length, getDefaultPins());
         mxconfig.double_buff = false;
 
-        // 2. Initialize Display
-        display = new MatrixPanel_I2S_DMA(mxconfig);
+        s_display = new MatrixPanel_I2S_DMA(mxconfig);
 
-        if (!display || !display->begin()) {
-            // CRITICAL FIX: If hardware fails to start, we MUST reboot.
-            // Continuing results in Watchdog panic.
-            jac::Logger::error("Hub75Holder: Hardware Init Failed! Performing "
-                               "Emergency Reboot...");
-            if (display)
-                delete display;
-
-            // Allow logs to flush
+        if (!s_display || !s_display->begin()) {
+            jac::Logger::error(
+                "Hub75Holder: Hardware Init Failed! Rebooting...");
             vTaskDelay(pdMS_TO_TICKS(200));
             esp_restart();
             return;
         }
 
-        jac::Logger::debug("Hub75Holder: Allocating PSRAM...");
+        this->display = s_display;
 
-        // PSRAM Allocation
+        jac::Logger::debug("Hub75Holder: Allocating PSRAM...");
         uint32_t caps = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
         m_previousBuffer =
             (Color *)heap_caps_malloc(m_buffer_count * sizeof(Color), caps);
@@ -107,7 +144,6 @@ class Hub75Holder {
 
         if (!m_previousBuffer || !m_current_frame_buffer || !m_pixel_is_set) {
             jac::Logger::error("Hub75Holder: Out of Memory (PSRAM)");
-            vTaskDelete(NULL);
             return;
         }
 
@@ -121,58 +157,6 @@ class Hub75Holder {
 
         m_initialized = true;
         jac::Logger::debug("Hub75Holder: Initialization COMPLETE.");
-
-        vTaskDelete(NULL);
-    }
-
-    static void task_trampoline(void *arg) {
-        static_cast<Hub75Holder *>(arg)->init_task();
-    }
-
-  public:
-    Hub75Holder(int panelWidth, int panelHeight, int chainLength)
-        : display(nullptr), m_previousBuffer(nullptr),
-          m_current_frame_buffer(nullptr), m_pixel_is_set(nullptr),
-          m_initialized(false) {
-
-        if (active_instance) {
-            jac::Logger::debug(
-                "Hub75: Soft-reload detected. Rebooting for stability...");
-            vTaskDelay(pdMS_TO_TICKS(100));
-            esp_restart();
-            while (true) {
-                vTaskDelay(100);
-            }
-        }
-
-        active_instance = this;
-
-        m_width = panelWidth * chainLength;
-        m_height = panelHeight;
-        m_chain_length = chainLength;
-        m_buffer_count = m_width * m_height;
-    }
-
-    ~Hub75Holder() {
-        if (display) {
-            delete display;
-            display = nullptr;
-        }
-
-        if (m_current_frame_buffer)
-            delete[] m_current_frame_buffer;
-        if (m_previousBuffer)
-            delete[] m_previousBuffer;
-        if (m_pixel_is_set)
-            delete[] m_pixel_is_set;
-
-        if (active_instance == this) {
-            active_instance = nullptr;
-        }
-    }
-    void start() {
-        xTaskCreatePinnedToCore(this->task_trampoline, "hub75_init_task", 8192,
-                                this, 1, NULL, 1);
     }
 
     void setPixel(int x, int y, const Color &color) {
@@ -213,6 +197,7 @@ class Hub75Holder {
             }
         }
     }
+
     void setBufferFromRaw(const uint8_t *rawData, size_t size,
                           bool clearPrevious) {
         if (!m_initialized || !m_current_frame_buffer)
@@ -251,6 +236,7 @@ class Hub75Holder {
             }
         }
     }
+
     void clear() {
         if (m_initialized) {
             display->clearScreen();
@@ -267,6 +253,7 @@ class Hub75Holder {
 
     bool isInitialized() const { return m_initialized; }
 };
+
 inline const char *Hub75Holder::TAG = "Hub75Holder";
 template <> struct jac::ConvTraits<Pixels> {
     static Pixels from(ContextRef ctx, ValueWeak val) {
@@ -298,16 +285,12 @@ template <class Next> class Hub75Feature : public Next {
       public:
         static Hub75Holder *constructOpaque(jac::ContextRef ctx,
                                             std::vector<jac::ValueWeak> args) {
-            // Singleton Logic:
-            if (!s_instance) {
-                int pW = args.size() > 0 ? args[0].to<int>() : 64;
-                int pH = args.size() > 1 ? args[1].to<int>() : 32;
-                int cL = args.size() > 2 ? args[2].to<int>() : 1;
-                s_instance = new Hub75Holder(pW, pH, cL);
-                s_instance->start();
-            } else {
-                s_instance->start();
-            }
+            int pW = args.size() > 0 ? args[0].to<int>() : 64;
+            int pH = args.size() > 1 ? args[1].to<int>() : 32;
+            int cL = args.size() > 2 ? args[2].to<int>() : 1;
+
+            s_instance = new Hub75Holder(pW, pH, cL);
+            s_instance->start();
             return s_instance;
         }
 
@@ -321,15 +304,12 @@ template <class Next> class Hub75Feature : public Next {
                     auto *holder = getOpaque(ctx, thisVal);
                     if (!holder)
                         return;
-
                     auto *fb = FrameBufferProtoBuilder::unwrap(ctx, bufferVal);
-
                     if (!fb || !fb->data)
                         return;
                     holder->setBufferFromRaw(fb->data, fb->size, clear);
-                    if (clear) {
+                    if (clear)
                         fb->size = 0;
-                    }
                 }),
                 jac::PropFlags::Enumerable);
 
@@ -341,30 +321,23 @@ template <class Next> class Hub75Feature : public Next {
                     auto *holder = getOpaque(ctx, thisVal);
                     if (!holder)
                         return;
-
                     size_t len;
                     uint8_t *buf =
                         JS_GetArrayBuffer(ctx, &len, bufferVal.getVal());
-
                     if (!buf || len == 0)
                         return;
-
                     Pixels pixels;
                     size_t count = len / 8;
                     pixels.reserve(count);
-
                     for (size_t i = 0; i < len; i += 8) {
                         int16_t x = buf[i] | (buf[i + 1] << 8);
                         int16_t y = buf[i + 2] | (buf[i + 3] << 8);
-
                         uint8_t r = buf[i + 4];
                         uint8_t g = buf[i + 5];
                         uint8_t b = buf[i + 6];
                         float a = buf[i + 7] / 255.0f;
-
                         pixels.push_back({x, y, Color(r, g, b, a)});
                     }
-
                     holder->setBuffer(pixels, clear);
                 }),
                 jac::PropFlags::Enumerable);

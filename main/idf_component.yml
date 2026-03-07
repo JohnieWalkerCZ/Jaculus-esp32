@@ -20,3 +20,6 @@ dependencies:
   ESP32-HUB75-MatrixPanel-DMA:
     git: https://github.com/mrcodetastic/ESP32-HUB75-MatrixPanel-DMA.git
     version: 3.0.13
+  renderer:
+    git: https://github.com/RoboticsBrno/2D-renderer-cpp.git
+    version: 1.0.3

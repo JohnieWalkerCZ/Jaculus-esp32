@@ -1,27 +1,29 @@
 #pragma once
 
+#include "Circle.hpp"
+#include "Collection.hpp"
+#include "Font.hpp"
+#include "LineSegment.hpp"
+#include "Point.hpp"
+#include "Polygon.hpp"
+#include "Rectangle.hpp"
+#include "RegularPolygon.hpp"
+#include "Renderer.hpp"
+#include "Shape.hpp"
+#include "Utils.hpp"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
-#include "include/Font/Font.hpp"
-#include "include/Renderer.hpp"
-#include "include/Shapes/Circle.hpp"
-#include "include/Shapes/Collection.hpp"
-#include "include/Shapes/LineSegment.hpp"
-#include "include/Shapes/Point.hpp"
-#include "include/Shapes/Polygon.hpp"
-#include "include/Shapes/Rectangle.hpp"
-#include "include/Shapes/RegularPolygon.hpp"
-#include "include/Shapes/Shape.hpp"
 #include "jac/device/logger.h"
 #include "jac/machine/context.h"
 #include "jac/machine/internal/declarations.h"
 #include "quickjs.h"
-#include "types.h"
 
+#include <cstdint>
 #include <jac/machine/class.h>
 #include <jac/machine/functionFactory.h>
 #include <jac/machine/machine.h>
 #include <jac/machine/values.h>
+#include <memory>
 
 // ===================================
 //      Type Conversions (ConvTraits)
@@ -55,11 +57,8 @@ template <> struct jac::ConvTraits<Color> {
     }
 
     static jac::Value to(ContextRef ctx, const Color &color) {
-        // 1. Create empty array (Fix: create() takes only ctx)
         auto arr = jac::Array::create(ctx);
 
-        // 2. Set elements (0, 1, 2, 3)
-        // We use jac::toValue to ensure primitives are boxed correctly
         arr.set(0, jac::toValue(ctx, color.r));
         arr.set(1, jac::toValue(ctx, color.g));
         arr.set(2, jac::toValue(ctx, color.b));
@@ -135,7 +134,8 @@ template <> struct jac::ConvTraits<RegularPolygonRadiusParams> {
         return RegularPolygonRadiusParams(
             obj.get<float>("x"), obj.get<float>("y"), obj.get<Color>("color"),
             obj.get<int>("sides"), obj.get<int>("radius"),
-            obj.hasProperty("fill") ? obj.get<bool>("fill") : false);
+            obj.hasProperty("fill") ? obj.get<bool>("fill") : false,
+            obj.hasProperty("z") ? obj.get<float>("z") : 0);
     }
 };
 
@@ -217,12 +217,12 @@ class TextureProtoBuilder : public jac::ProtoBuilder::Opaque<Texture>,
     }
 };
 
-class ShapeProtoBuilder : public jac::ProtoBuilder::Opaque<Shape>,
-                          public jac::ProtoBuilder::Properties {
+class ShapeProtoBuilder
+    : public jac::ProtoBuilder::Opaque<std::shared_ptr<Shape>>,
+      public jac::ProtoBuilder::Properties {
 
   private:
     static inline std::vector<JSClassID> derivedClassIDs;
-
     using ShapeGetter =
         std::function<jac::Value(jac::ContextRef ctx, Shape *shape)>;
 
@@ -368,7 +368,7 @@ class ShapeProtoBuilder : public jac::ProtoBuilder::Opaque<Shape>,
                                   jac::ValueWeak texVal) {
                 jac::Logger::debug("setTexture called");
                 auto *shape = unwrapShape(ctx, thisVal);
-                // Unwrap the Texture object
+
                 Texture *tex = TextureProtoBuilder::unwrap(ctx, texVal);
                 if (shape && tex) {
                     shape->setTexture(tex);
@@ -418,13 +418,23 @@ class ShapeProtoBuilder : public jac::ProtoBuilder::Opaque<Shape>,
         proto.defineProperty(
             "intersects",
             ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisVal,
-                                  jac::Object otherShapeVal) {
-                Shape *shape1 = unwrapShape(ctx, thisVal);
-                Shape *shape2 = unwrapShape(ctx, otherShapeVal);
-                if (shape1 && shape2) {
-                    return jac::toValue(ctx, shape1->intersects(shape2));
+                                  jac::ValueWeak otherShapeVal) {
+                void *ptr1 = JS_GetOpaque(thisVal.getVal(),
+                                          JS_GetClassID(thisVal.getVal()));
+
+                void *ptr2 =
+                    JS_GetOpaque(otherShapeVal.getVal(),
+                                 JS_GetClassID(otherShapeVal.getVal()));
+
+                if (ptr1 && ptr2) {
+                    auto &s1 = *static_cast<std::shared_ptr<Shape> *>(ptr1);
+                    auto &s2 = *static_cast<std::shared_ptr<Shape> *>(ptr2);
+
+                    if (s1 && s2) {
+                        return jac::toValue(ctx, s1->intersects(s2));
+                    }
                 }
-                return jac::Value::undefined(ctx);
+                return jac::Value::from(ctx, false);
             }),
             jac::PropFlags::Enumerable);
 
@@ -474,13 +484,13 @@ class ShapeProtoBuilder : public jac::ProtoBuilder::Opaque<Shape>,
         void *ptr = JS_GetOpaque(thisVal.getVal(), classId);
 
         if (ptr) {
-            return static_cast<Shape *>(ptr);
+            return (*static_cast<std::shared_ptr<Shape> *>(ptr)).get();
         }
 
         for (auto derivedClassId : derivedClassIDs) {
             ptr = JS_GetOpaque(thisVal.getVal(), derivedClassId);
             if (ptr) {
-                return static_cast<Shape *>(ptr);
+                return (*static_cast<std::shared_ptr<Shape> *>(ptr)).get();
             }
         }
 
@@ -500,12 +510,14 @@ class ShapeProtoBuilder : public jac::ProtoBuilder::Opaque<Shape>,
 
 #define SHAPE_BUILDER_BOILERPLATE(ClassName, ParamsType)                       \
     class ClassName##ProtoBuilder                                              \
-        : public jac::ProtoBuilder::Opaque<ClassName>,                         \
+        : public jac::ProtoBuilder::Opaque<std::shared_ptr<Shape>>,            \
           public jac::ProtoBuilder::Properties {                               \
       public:                                                                  \
-        static ClassName *constructOpaque(jac::ContextRef ctx,                 \
-                                          std::vector<jac::ValueWeak> args) {  \
-            return new ClassName(jac::fromValue<ParamsType>(ctx, args[0]));    \
+        static std::shared_ptr<Shape> *                                        \
+        constructOpaque(jac::ContextRef ctx,                                   \
+                        std::vector<jac::ValueWeak> args) {                    \
+            return new std::shared_ptr<Shape>(                                 \
+                new ClassName(jac::fromValue<ParamsType>(ctx, args[0])));      \
         }                                                                      \
         static void addProperties(jac::ContextRef ctx, jac::Object proto) {    \
             ShapeProtoBuilder::addProperties(ctx, proto);                      \
@@ -518,34 +530,47 @@ SHAPE_BUILDER_BOILERPLATE(Polygon, PolygonParams)
 SHAPE_BUILDER_BOILERPLATE(LineSegment, LineSegmentParams)
 SHAPE_BUILDER_BOILERPLATE(Point, ShapeParams)
 
-class CollectionProtoBuilder : public jac::ProtoBuilder::Opaque<Collection>,
-                               public jac::ProtoBuilder::Properties {
+class CollectionProtoBuilder
+    : public jac::ProtoBuilder::Opaque<std::shared_ptr<Collection>>,
+      public jac::ProtoBuilder::Properties {
   public:
-    static Collection *constructOpaque(jac::ContextRef ctx,
-                                       std::vector<jac::ValueWeak> args) {
-        return new Collection(jac::fromValue<ShapeParams>(ctx, args[0]));
+    static std::shared_ptr<Collection> *
+    constructOpaque(jac::ContextRef ctx, std::vector<jac::ValueWeak> args) {
+        auto rawPtr = new Collection(jac::fromValue<ShapeParams>(ctx, args[0]));
+        return new std::shared_ptr<Collection>(rawPtr);
     }
+
     static void addProperties(jac::ContextRef ctx, jac::Object proto) {
         ShapeProtoBuilder::addProperties(ctx, proto);
         jac::FunctionFactory ff(ctx);
+
         proto.defineProperty(
             "add",
             ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisVal,
                                   jac::Object shapeVal) {
-                auto &collection = *getOpaque(ctx, thisVal);
-                auto shape = reinterpret_cast<Shape *>(JS_GetOpaque(
-                    shapeVal.getVal(), JS_GetClassID(shapeVal.getVal())));
-                if (shape) {
-                    collection.addShape(shape);
+                auto collectionPtr = getOpaque(ctx, thisVal);
+                if (!collectionPtr || !*collectionPtr)
+                    return;
+                void *shapeOpaque = JS_GetOpaque(
+                    shapeVal.getVal(), JS_GetClassID(shapeVal.getVal()));
+
+                if (shapeOpaque) {
+                    auto shapePtr =
+                        reinterpret_cast<std::shared_ptr<Shape> *>(shapeOpaque);
+
+                    if (shapePtr && *shapePtr) {
+                        (*collectionPtr)->addShape(*shapePtr);
+                    }
                 }
             }),
             jac::PropFlags::Enumerable);
+
         proto.defineProperty(
             "clear",
             ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisVal) {
-                auto *collection = getOpaque(ctx, thisVal);
-                if (collection) {
-                    collection->clear();
+                auto collectionPtr = getOpaque(ctx, thisVal);
+                if (collectionPtr && *collectionPtr) {
+                    (*collectionPtr)->clear();
                 }
                 return jac::Value::undefined(ctx);
             }),
@@ -554,25 +579,26 @@ class CollectionProtoBuilder : public jac::ProtoBuilder::Opaque<Collection>,
 };
 
 class RegularPolygonProtoBuilder
-    : public jac::ProtoBuilder::Opaque<RegularPolygon>,
+    : public jac::ProtoBuilder::Opaque<std::shared_ptr<Shape>>,
       public jac::ProtoBuilder::Properties {
   public:
-    static RegularPolygon *constructOpaque(jac::ContextRef ctx,
-                                           std::vector<jac::ValueWeak> args) {
+    static std::shared_ptr<Shape> *
+    constructOpaque(jac::ContextRef ctx, std::vector<jac::ValueWeak> args) {
         auto obj = args[0].to<jac::ObjectWeak>();
+        Shape *rawShape;
         if (obj.hasProperty("radius")) {
-            return new RegularPolygon(
+            rawShape = new RegularPolygon(
                 jac::fromValue<RegularPolygonRadiusParams>(ctx, args[0]));
         } else {
-            return new RegularPolygon(
+            rawShape = new RegularPolygon(
                 jac::fromValue<RegularPolygonSideParams>(ctx, args[0]));
         }
+        return new std::shared_ptr<Shape>(rawShape);
     }
     static void addProperties(jac::ContextRef ctx, jac::Object proto) {
         ShapeProtoBuilder::addProperties(ctx, proto);
     }
 };
-
 struct FrameBufferHolder {
     uint8_t *data;
     size_t size;
@@ -618,7 +644,7 @@ class FrameBufferProtoBuilder
             ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisVal) {
                 auto *fb = getOpaque(ctx, thisVal);
                 if (fb) {
-                    fb->size = 0; // Simply resetting size resets the buffer
+                    fb->size = 0;
                 }
                 return jac::Value::undefined(ctx);
             }),
@@ -725,61 +751,73 @@ class RendererProtoBuilder : public jac::ProtoBuilder::Opaque<RendererHolder>,
         jac::FunctionFactory ff(ctx);
         proto.defineProperty(
             "render",
-            ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisVal,
-                                  jac::Object collectionVal,
-                                  jac::Object bufferObj)
-                                   -> jac::Value { // Accept Buffer as 3rd arg
-                // 1. Get Renderer
-                auto *holder = getOpaque(ctx, thisVal);
-                if (!holder)
+            ff.newFunctionThisVariadic(
+                [](jac::ContextRef ctx, jac::ValueWeak thisVal,
+                   std::vector<jac::ValueWeak> args) -> jac::Value {
+                    if (args.size() < 2) {
+                        jac::Logger::error("Renderer.render: Missing arguments "
+                                           "(collection, buffer)");
+                        return jac::Value::undefined(ctx);
+                    }
+
+                    auto *holder = getOpaque(ctx, thisVal);
+                    if (!holder)
+                        return jac::Value::undefined(ctx);
+
+                    jac::ValueWeak collectionVal = args[0];
+                    auto collectionPtr =
+                        reinterpret_cast<std::shared_ptr<Collection> *>(
+                            JS_GetOpaque(
+                                collectionVal.getVal(),
+                                JS_GetClassID(collectionVal.getVal())));
+
+                    if (!collectionPtr || !*collectionPtr)
+                        return jac::Value::undefined(ctx);
+
+                    jac::ValueWeak bufferObj = args[1];
+                    auto *fb = FrameBufferProtoBuilder::unwrap(ctx, bufferObj);
+                    if (!fb || !fb->data) {
+                        jac::Logger::error(
+                            "Renderer: Invalid FrameBuffer passed");
+                        return jac::Value::undefined(ctx);
+                    }
+
+                    bool antialias = true;
+                    if (args.size() >= 3) {
+                        antialias = args[2].to<bool>();
+                    }
+
+                    int w = holder->getWidth();
+                    int h = holder->getHeight();
+                    Pixels &pixels = holder->getScratchPad();
+
+                    holder->getRenderer()->render(pixels, {*collectionPtr},
+                                                  {w, h, antialias});
+
+                    size_t offset = 0;
+                    uint8_t *raw = fb->data;
+                    size_t maxBytes = fb->capacity;
+
+                    for (const auto &p : pixels) {
+                        if (offset + 8 > maxBytes)
+                            break;
+
+                        int16_t x = (int16_t)p.x;
+                        raw[offset++] = x & 0xFF;
+                        raw[offset++] = (x >> 8) & 0xFF;
+                        int16_t y = (int16_t)p.y;
+                        raw[offset++] = y & 0xFF;
+                        raw[offset++] = (y >> 8) & 0xFF;
+                        raw[offset++] = p.color.r;
+                        raw[offset++] = p.color.g;
+                        raw[offset++] = p.color.b;
+                        raw[offset++] = (uint8_t)(p.color.a * 255);
+                    }
+                    fb->size = offset;
+
                     return jac::Value::undefined(ctx);
-                // 2. Get Scene
-                auto collection = reinterpret_cast<Collection *>(
-                    JS_GetOpaque(collectionVal.getVal(),
-                                 JS_GetClassID(collectionVal.getVal())));
-                if (!collection)
-                    return jac::Value::undefined(ctx);
-                // 3. Get Reuseable Buffer (The Fix)
-                // We access the C++ object directly from the JS object
-                // passed in
-                auto *fb = FrameBufferProtoBuilder::unwrap(ctx, bufferObj);
-                if (!fb || !fb->data) {
-                    jac::Logger::error("Renderer: Invalid FrameBuffer passed");
-                    return jac::Value::undefined(ctx);
-                }
-
-                int w = holder->getWidth();
-                int h = holder->getHeight();
-                logMemory();
-                Pixels &pixels = holder->getScratchPad();
-                holder->getRenderer()->render(pixels, {collection},
-                                              {w, h, true});
-                size_t offset = 0;
-                uint8_t *raw = fb->data;
-
-                size_t maxBytes = fb->capacity;
-
-                for (const auto &p : pixels) {
-                    if (offset + 8 > maxBytes)
-                        break;
-
-                    int16_t x = (int16_t)p.x;
-                    raw[offset++] = x & 0xFF;
-                    raw[offset++] = (x >> 8) & 0xFF;
-                    int16_t y = (int16_t)p.y;
-                    raw[offset++] = y & 0xFF;
-                    raw[offset++] = (y >> 8) & 0xFF;
-                    raw[offset++] = p.color.r;
-                    raw[offset++] = p.color.g;
-                    raw[offset++] = p.color.b;
-                    raw[offset++] = (uint8_t)(p.color.a * 255);
-                }
-                fb->size = offset;
-
-                return jac::Value::undefined(ctx);
-            }),
+                }),
             jac::PropFlags::Enumerable);
-
         proto.defineProperty(
             "drawText",
             ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisVal,
