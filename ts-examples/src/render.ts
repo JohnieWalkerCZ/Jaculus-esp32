@@ -1,5 +1,6 @@
 import { Hub75 } from 'hub75';
-import { Font, FrameBuffer, Renderer, Texture } from 'renderer';
+import { Font, Renderer, Texture } from 'renderer';
+import { Format } from './constants.js';
 import {
     Collection,
     Rectangle,
@@ -14,11 +15,13 @@ import {
 const PANEL_WIDTH = 64;
 const PANEL_HEIGHT = 64;
 
+const MAX_PIXELS = PANEL_WIDTH * PANEL_HEIGHT;
+const BUFFER_SIZE_BYTES = MAX_PIXELS * 9;
+
 export async function shapeExample() {
-    // 1. Initialize System
     const display = new Hub75(PANEL_WIDTH, PANEL_HEIGHT);
     const renderer = new Renderer(PANEL_WIDTH, PANEL_HEIGHT);
-    const buffer = new FrameBuffer(PANEL_WIDTH, PANEL_HEIGHT);
+    const buffer = new ArrayBuffer(BUFFER_SIZE_BYTES);
 
     // 2. Wait for Hardware
     while (!display.isInitialized()) {
@@ -52,7 +55,6 @@ export async function shapeExample() {
         fill: true
     });
     scene.add(circle);
-
 
     // --- Green Hexagon (Bottom Right) ---
     const hexagon = new RegularPolygon({
@@ -116,13 +118,11 @@ export async function shapeExample() {
     console.log("Starting Render Loop...");
 
     while (true) {
-        // Render scene to buffer
-        renderer.render(scene, buffer, true);
+        // Render scene to buffer, capturing the exact amount of bytes written
+        const bytesWritten = renderer.render(scene, buffer);
 
-        // Push buffer to display
-        display.setBufferDirect(buffer, true);
+        display.setBuffer(buffer, bytesWritten, 10, true);
 
-        // Yield to let the display driver work
         await sleep(100);
     }
 }
@@ -130,11 +130,11 @@ export async function shapeExample() {
 export async function solarSystemExample() {
     const display = new Hub75(PANEL_WIDTH, PANEL_HEIGHT);
     const renderer = new Renderer(PANEL_WIDTH, PANEL_HEIGHT);
-    const buffer = new FrameBuffer(PANEL_WIDTH, PANEL_HEIGHT);
+    const buffer = new ArrayBuffer(BUFFER_SIZE_BYTES);
     console.log("Initializing Display...");
 
     // 3. Construct the Scene
-    const sunCollection = new Collection({ x: 32, y: 32, color: [0, 0, 0, 1], z: 0 });
+    const sunCollection = new Collection({ x: 0, y: 0, color: [0, 0, 0, 1], z: 0 });
     sunCollection.setPivot(32, 32);
 
     const sun = new Circle({
@@ -145,7 +145,7 @@ export async function solarSystemExample() {
     });
     sunCollection.add(sun);
 
-    const earthCollection = new Collection({ x: 32, y: 32, color: [0, 0, 0, 1], z: 5 });
+    const earthCollection = new Collection({ x: 0, y: 0, color: [0, 0, 0, 1], z: 5 });
     earthCollection.setPivot(32, 32);
 
     const earth = new Circle({
@@ -166,7 +166,8 @@ export async function solarSystemExample() {
     });
     earthCollection.add(alien);
 
-    const moonCollection = new Collection({ x: 32 + 20, y: 32, color: [0, 0, 0, 1], z: 10 });
+    const moonCollection = new Collection({ x: 0, y: 0, color: [0, 0, 0, 1], z: 10 });
+    moonCollection.setPivot(52, 32);
 
     const moon = new Circle({
         x: 32 + 20 + 8, y: 32,
@@ -202,9 +203,9 @@ export async function solarSystemExample() {
         earthCollection.rotate(1.5);
         moonCollection.rotate(3);
 
-        renderer.render(sunCollection, buffer);
+        const bytesWritten = renderer.render(sunCollection, buffer);
 
-        display.setBufferDirect(buffer, true);
+        display.setBuffer(buffer, bytesWritten, 10, true);
         await sleep(1);
     }
 }
@@ -212,7 +213,7 @@ export async function solarSystemExample() {
 export async function collisionExample() {
     const display = new Hub75(PANEL_WIDTH, PANEL_HEIGHT);
     const renderer = new Renderer(PANEL_WIDTH, PANEL_HEIGHT);
-    const buffer = new FrameBuffer(PANEL_WIDTH, PANEL_HEIGHT);
+    const buffer = new ArrayBuffer(BUFFER_SIZE_BYTES);
 
     // Wait for Hardware
     while (!display.isInitialized()) {
@@ -220,9 +221,8 @@ export async function collisionExample() {
     }
 
     // Main Collection
-    const mainCollection = new Collection({ x: 32, y: 32, color: [0, 0, 0, 1], z: 0 });
+    const mainCollection = new Collection({ x: 0, y: 0, color: [0, 0, 0, 1], z: 0 });
 
-    // Triangle (Green, 3 sides, radius 4) positioned at (32, 60) in C++
     const triangle = new RegularPolygon({
         x: 32, y: 60,
         radius: 4,
@@ -238,11 +238,9 @@ export async function collisionExample() {
         color: [255, 0, 0, 1],
         fill: true
     });
-    console.log("Adding Colliders...");
     // Add colliders
     triangle.addCollider();
     enemy.addCollider();
-    console.log("Colliders Added.");
 
     mainCollection.add(triangle);
     mainCollection.add(enemy);
@@ -254,7 +252,6 @@ export async function collisionExample() {
         enemy.translate(0, 1);
 
         // Check collision
-        console.log("Checking Collision...");
         if (triangle.intersects(enemy)) {
             console.log("Collision!");
             triangle.setColor([255, 0, 0, 1]); // Red on collision
@@ -263,8 +260,8 @@ export async function collisionExample() {
             triangle.setColor([0, 255, 0, 1]); // Green otherwise
         }
 
-        renderer.render(mainCollection, buffer);
-        display.setBufferDirect(buffer, true);
+        const bytesWritten = renderer.render(mainCollection, buffer);
+        display.setBuffer(buffer, bytesWritten, 10, true);
 
         await sleep(100);
     }
@@ -273,12 +270,14 @@ export async function collisionExample() {
 async function textExample() {
     const display = new Hub75(PANEL_WIDTH, PANEL_HEIGHT);
     const renderer = new Renderer(PANEL_WIDTH, PANEL_HEIGHT);
-    let buffer = new FrameBuffer(PANEL_WIDTH, PANEL_HEIGHT);
+    const buffer = new ArrayBuffer(BUFFER_SIZE_BYTES);
     const font = new Font();
 
     while (true) {
-        // Draw "ABCDEFGHIJKLMNOPQRSTUVWXYZ" in Red
-        renderer.drawText(
+        let bytesWritten = 0;
+
+        // 1. Draw "ABCDEFGHIJKLMNOPQRSTUVWXYZ" in Red
+        bytesWritten = renderer.drawText(
             buffer,
             "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
             0, 0,
@@ -287,8 +286,11 @@ async function textExample() {
             true // Wrap
         );
 
-        // Draw Numbers in Blue
-        renderer.drawText(
+        // Push to display AND clear the previous frame (true)
+        display.setBuffer(buffer, bytesWritten, 10, true);
+
+        // 2. Draw Numbers in Blue
+        bytesWritten = renderer.drawText(
             buffer,
             "0123456789",
             0, 48,
@@ -296,9 +298,11 @@ async function textExample() {
             [0, 0, 255, 1], // Blue
             true
         );
+        // Push to display, but DO NOT clear the previous letters (false)
+        display.setBuffer(buffer, bytesWritten, 10, false);
 
-        // Draw "abcdefghijklmnopqrstuvwxyz" in Green
-        renderer.drawText(
+        // 3. Draw "abcdefghijklmnopqrstuvwxyz" in Green
+        bytesWritten = renderer.drawText(
             buffer,
             "abcdefghijklmnopqrstuvwxyz",
             0, 24,
@@ -306,12 +310,15 @@ async function textExample() {
             [0, 255, 0, 1], // Green
             true
         );
+        // Push to display, DO NOT clear (false)
+        display.setBuffer(buffer, bytesWritten, 10, false);
 
-        display.setBufferDirect(buffer, true);
         console.log("Displayed Alphabet and Numbers.");
-        // Wait 10 seconds
+
+        // Wait 1 second (1000ms)
         await sleep(1000);
-        renderer.drawText(
+
+        bytesWritten = renderer.drawText(
             buffer,
             "!\"#$%&'()*+,-./:;<=>?@[\\]^_`|~ ",
             0, 0,
@@ -320,7 +327,7 @@ async function textExample() {
             true
         );
         console.log("Displaying Symbols...");
-        display.setBufferDirect(buffer, true);
+        display.setBuffer(buffer, bytesWritten, 10, true);
         await sleep(1000);
     }
 }
@@ -328,7 +335,7 @@ async function textExample() {
 async function textureExample() {
     const display = new Hub75(PANEL_WIDTH, PANEL_HEIGHT);
     const renderer = new Renderer(PANEL_WIDTH, PANEL_HEIGHT);
-    const buffer = new FrameBuffer(PANEL_WIDTH, PANEL_HEIGHT);
+    const buffer = new ArrayBuffer(BUFFER_SIZE_BYTES);
 
     const texture = new Texture();
     const success = texture.load("/data/data/brick.bmp");
@@ -339,12 +346,12 @@ async function textureExample() {
         console.log("Failed to load texture BMP");
     }
 
-    const scene = new Collection({ x: 29, y: 29, color: "black" });
+    const scene = new Collection({ x: 0, y: 0, color: "black" });
 
     const rect = new Rectangle({
-        x: -13, y: -13,
+        x: 0, y: 0,
         color: [255, 255, 255, 1],
-        width: 91, height: 91,
+        width: 64, height: 64,
         fill: true
     });
     rect.setTexture(texture);
@@ -355,44 +362,21 @@ async function textureExample() {
     scene.add(rect);
 
     while (true) {
-        rect.rotate(1.0);
 
-        renderer.render(scene, buffer);
+        const bytesWritten = renderer.render(scene, buffer, true, Format.RGB_888);
+        console.log(bytesWritten)
 
-        display.setBufferDirect(buffer, true);
+        display.setBuffer(buffer, bytesWritten, Format.RGB_888, true);
 
-        await sleep(10);
-    }
-}
-
-async function test() {
-    const display = new Hub75(PANEL_WIDTH, PANEL_HEIGHT);
-    const renderer = new Renderer(PANEL_WIDTH, PANEL_HEIGHT);
-    let buffer = new FrameBuffer(PANEL_WIDTH, PANEL_HEIGHT);
-    const font = new Font();
-
-    while (true) {
-        // Draw "ABCDEFGHIJKLMNOPQRSTUVWXYZ" in Red
-        renderer.drawText(
-            buffer,
-            "Ahoj jsem   Jirka!",
-            0, 0,
-            font,
-            [50, 255, 50, 0.5], // Red
-            true // Wrap
-        );
-
-        display.setBufferDirect(buffer, true);
-        await sleep(1000);
+        await sleep(500);
     }
 }
 
 async function main() {
     // Uncomment the example you want to run
-    await shapeExample();
+    // await shapeExample();
     // await solarSystemExample();
     // await collisionExample();
-    // await test();
     // await textExample();
     // await textureExample();
 }

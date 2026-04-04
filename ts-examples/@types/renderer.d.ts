@@ -111,10 +111,6 @@ declare module "shapes" {
 declare module "renderer" {
     import { Collection, Color } from "shapes";
 
-    export class FrameBuffer {
-        constructor(width: number, height: number);
-        clear(): void;
-    }
     export class Texture {
         constructor();
         load(path: string): boolean;
@@ -132,7 +128,7 @@ declare module "renderer" {
 
     export class Renderer {
         constructor(width: number, height: number);
-        render(scene: Collection, buffer: FrameBuffer, antialias?: boolean): void;
-        drawText(buffer: FrameBuffer, text: string, x: number, y: number, font: Font, color: Color, wrap: boolean): void;
+        render(scene: Collection, buffer: ArrayBuffer, antialias?: boolean, format?: import("../src/constants.js").Format): number;
+        drawText(buffer: ArrayBuffer, text: string, x: number, y: number, font: Font, color: Color, wrap: boolean, format?: import("../src/constants.js").Format): number;
     }
 }

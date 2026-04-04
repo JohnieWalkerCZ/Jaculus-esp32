@@ -25,6 +25,67 @@
 #include <jac/machine/values.h>
 #include <memory>
 
+// Reference:
+// https://419.ecma-international.org/3.0/index.html#-15-display-class-pattern-pixel-format-values
+size_t packColor(uint8_t *raw, const Color &p, int format) {
+    uint8_t r = p.r;
+    uint8_t g = p.g;
+    uint8_t b = p.b;
+    uint8_t a = (uint8_t)(p.a * 255);
+
+    switch (format) {
+    case 3: { // 1-bit monochrome
+        raw[0] = (r + g + b) / 3 > 127 ? 1 : 0;
+        return 1;
+    }
+    case 4: { // 4-bit grayscale
+        uint8_t gray = (uint8_t)((0.299f * r + 0.587f * g + 0.114f * b));
+        raw[0] = (gray >> 4) & 0x0F;
+        return 1;
+    }
+    case 5: { // 8-bit grayscale
+        raw[0] = (uint8_t)(0.299f * r + 0.587f * g + 0.114f * b);
+        return 1;
+    }
+    case 6: { // 8-bit RGB 3:3:2
+        raw[0] = (r & 0xE0) | ((g >> 3) & 0x1C) | (b >> 6);
+        return 1;
+    }
+    case 7: { // 16-bit RGB 5:6:5 Little-Endian
+        uint16_t rgb = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+        raw[0] = rgb & 0xFF;
+        raw[1] = (rgb >> 8) & 0xFF;
+        return 2;
+    }
+    case 8: { // 16-bit RGB 5:6:5 Big-Endian
+        uint16_t rgb = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+        raw[0] = (rgb >> 8) & 0xFF;
+        raw[1] = rgb & 0xFF;
+        return 2;
+    }
+    case 9: { // 24-bit RGB 8:8:8
+        raw[0] = r;
+        raw[1] = g;
+        raw[2] = b;
+        return 3;
+    }
+    case 10: { // 32-bit RGBA 8:8:8:8
+        raw[0] = r;
+        raw[1] = g;
+        raw[2] = b;
+        raw[3] = a;
+        return 4;
+    }
+    case 12: { // 12-bit xRGB 4:4:4:4 (x is unused/alpha)
+        raw[0] = (g & 0xF0) | (b >> 4);
+        raw[1] = (a & 0xF0) | (r >> 4); // a used as 'x'
+        return 2;
+    }
+    default:
+        return 0;
+    }
+}
+
 // ===================================
 //      Type Conversions (ConvTraits)
 // ===================================
@@ -366,7 +427,6 @@ class ShapeProtoBuilder
             "setTexture",
             ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisVal,
                                   jac::ValueWeak texVal) {
-                jac::Logger::debug("setTexture called");
                 auto *shape = unwrapShape(ctx, thisVal);
 
                 Texture *tex = TextureProtoBuilder::unwrap(ctx, texVal);
@@ -599,58 +659,6 @@ class RegularPolygonProtoBuilder
         ShapeProtoBuilder::addProperties(ctx, proto);
     }
 };
-struct FrameBufferHolder {
-    uint8_t *data;
-    size_t size;
-    size_t capacity;
-
-    FrameBufferHolder(size_t cap) : capacity(cap) {
-        data = (uint8_t *)heap_caps_malloc(capacity,
-                                           MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-
-        if (!data) {
-            jac::Logger::debug(
-                "FrameBuffer: PSRAM allocation failed, using Internal RAM");
-            data = (uint8_t *)malloc(capacity);
-        }
-        size = 0;
-    }
-
-    ~FrameBufferHolder() {
-        if (data)
-            free(data);
-    }
-};
-class FrameBufferProtoBuilder
-    : public jac::ProtoBuilder::Opaque<FrameBufferHolder>,
-      public jac::ProtoBuilder::Properties {
-  public:
-    static FrameBufferHolder *
-    constructOpaque(jac::ContextRef ctx, std::vector<jac::ValueWeak> args) {
-        int w = args[0].to<int>();
-        int h = args[1].to<int>();
-        return new FrameBufferHolder(w * h * 8 * 5);
-    }
-
-    static FrameBufferHolder *unwrap(jac::ContextRef ctx, jac::ValueWeak val) {
-        return getOpaque(ctx, val);
-    }
-
-    static void addProperties(jac::ContextRef ctx, jac::Object proto) {
-        jac::FunctionFactory ff(ctx);
-
-        proto.defineProperty(
-            "clear",
-            ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisVal) {
-                auto *fb = getOpaque(ctx, thisVal);
-                if (fb) {
-                    fb->size = 0;
-                }
-                return jac::Value::undefined(ctx);
-            }),
-            jac::PropFlags::Enumerable);
-    }
-};
 
 class FontProtoBuilder : public jac::ProtoBuilder::Opaque<Font>,
                          public jac::ProtoBuilder::Properties {
@@ -751,92 +759,118 @@ class RendererProtoBuilder : public jac::ProtoBuilder::Opaque<RendererHolder>,
         jac::FunctionFactory ff(ctx);
         proto.defineProperty(
             "render",
-            ff.newFunctionThisVariadic(
-                [](jac::ContextRef ctx, jac::ValueWeak thisVal,
-                   std::vector<jac::ValueWeak> args) -> jac::Value {
-                    if (args.size() < 2) {
-                        jac::Logger::error("Renderer.render: Missing arguments "
-                                           "(collection, buffer)");
-                        return jac::Value::undefined(ctx);
-                    }
-
-                    auto *holder = getOpaque(ctx, thisVal);
-                    if (!holder)
-                        return jac::Value::undefined(ctx);
-
-                    jac::ValueWeak collectionVal = args[0];
-                    auto collectionPtr =
-                        reinterpret_cast<std::shared_ptr<Collection> *>(
-                            JS_GetOpaque(
-                                collectionVal.getVal(),
-                                JS_GetClassID(collectionVal.getVal())));
-
-                    if (!collectionPtr || !*collectionPtr)
-                        return jac::Value::undefined(ctx);
-
-                    jac::ValueWeak bufferObj = args[1];
-                    auto *fb = FrameBufferProtoBuilder::unwrap(ctx, bufferObj);
-                    if (!fb || !fb->data) {
-                        jac::Logger::error(
-                            "Renderer: Invalid FrameBuffer passed");
-                        return jac::Value::undefined(ctx);
-                    }
-
-                    bool antialias = true;
-                    if (args.size() >= 3) {
-                        antialias = args[2].to<bool>();
-                    }
-
-                    int w = holder->getWidth();
-                    int h = holder->getHeight();
-                    Pixels &pixels = holder->getScratchPad();
-
-                    holder->getRenderer()->render(pixels, {*collectionPtr},
-                                                  {w, h, antialias});
-
-                    size_t offset = 0;
-                    uint8_t *raw = fb->data;
-                    size_t maxBytes = fb->capacity;
-
-                    for (const auto &p : pixels) {
-                        if (offset + 8 > maxBytes)
-                            break;
-
-                        int16_t x = (int16_t)p.x;
-                        raw[offset++] = x & 0xFF;
-                        raw[offset++] = (x >> 8) & 0xFF;
-                        int16_t y = (int16_t)p.y;
-                        raw[offset++] = y & 0xFF;
-                        raw[offset++] = (y >> 8) & 0xFF;
-                        raw[offset++] = p.color.r;
-                        raw[offset++] = p.color.g;
-                        raw[offset++] = p.color.b;
-                        raw[offset++] = (uint8_t)(p.color.a * 255);
-                    }
-                    fb->size = offset;
-
+            ff.newFunctionThisVariadic([](jac::ContextRef ctx,
+                                          jac::ValueWeak thisVal,
+                                          std::vector<jac::ValueWeak> args)
+                                           -> jac::Value {
+                if (args.size() < 2) {
+                    jac::Logger::error("Renderer.render: Missing arguments "
+                                       "(collection, buffer)");
                     return jac::Value::undefined(ctx);
-                }),
-            jac::PropFlags::Enumerable);
-        proto.defineProperty(
-            "drawText",
-            ff.newFunctionThis([](jac::ContextRef ctx, jac::ValueWeak thisVal,
-                                  jac::Object bufferObj, std::string text,
-                                  int x, int y, jac::ValueWeak fontValue,
-                                  jac::ValueWeak colorValue,
-                                  bool wrap) -> jac::Value {
+                }
+
                 auto *holder = getOpaque(ctx, thisVal);
                 if (!holder)
                     return jac::Value::undefined(ctx);
 
-                auto *fb = FrameBufferProtoBuilder::unwrap(ctx, bufferObj);
-                if (!fb || !fb->data)
+                jac::ValueWeak collectionVal = args[0];
+                auto collectionPtr =
+                    reinterpret_cast<std::shared_ptr<Collection> *>(
+                        JS_GetOpaque(collectionVal.getVal(),
+                                     JS_GetClassID(collectionVal.getVal())));
+
+                if (!collectionPtr || !*collectionPtr)
                     return jac::Value::undefined(ctx);
 
-                Font *fontPtr = FontProtoBuilder::unwrap(ctx, fontValue);
+                jac::ValueWeak bufferObj = args[1];
+
+                size_t maxBytes;
+                uint8_t *raw =
+                    JS_GetArrayBuffer(ctx, &maxBytes, bufferObj.getVal());
+                if (!raw) {
+                    jac::Logger::error("Renderer: Invalid ArrayBuffer passed");
+                    return jac::Value::undefined(ctx);
+                }
+
+                bool antialias = (args.size() > 2) ? args[2].to<bool>() : true;
+
+                int format = (args.size() > 3) ? args[3].to<int>() : 10;
+                if (format < 3 || format == 11 || format > 12) {
+                    jac::Logger::error("Renderer: Invalid color format");
+                }
+
+                int w = holder->getWidth();
+                int h = holder->getHeight();
+                Pixels &pixels = holder->getScratchPad();
+
+                holder->getRenderer()->render(pixels, {*collectionPtr},
+                                              {w, h, antialias});
+
+                size_t offset = 0;
+
+                for (const auto &p : pixels) {
+                    size_t colorBytesNeeded = (format == 10)  ? 4
+                                              : (format == 9) ? 3
+                                                              : 2;
+                    int positionBytesNeeded = 4;
+
+                    if (offset + positionBytesNeeded + colorBytesNeeded >
+                        maxBytes)
+                        break;
+
+                    int16_t x = (int16_t)p.x;
+                    raw[offset++] = x & 0xFF;
+                    raw[offset++] = (x >> 8) & 0xFF;
+                    int16_t y = (int16_t)p.y;
+                    raw[offset++] = y & 0xFF;
+                    raw[offset++] = (y >> 8) & 0xFF;
+
+                    offset += packColor(&raw[offset], p.color, format);
+                }
+
+                return jac::Value(ctx, static_cast<int>(offset));
+            }),
+            jac::PropFlags::Enumerable);
+
+        proto.defineProperty(
+            "drawText",
+            ff.newFunctionThisVariadic([](jac::ContextRef ctx,
+                                          jac::ValueWeak thisVal,
+                                          std::vector<jac::ValueWeak> args)
+                                           -> jac::Value {
+                if (args.size() < 6) {
+                    jac::Logger::error(
+                        "Renderer.drawText: Missing arguments "
+                        "(buffer, text, x, y, font, color, [wrap], [format])");
+                    return jac::Value::undefined(ctx);
+                }
+
+                auto *holder = getOpaque(ctx, thisVal);
+                if (!holder)
+                    return jac::Value::undefined(ctx);
+
+                jac::ValueWeak bufferObj = args[0];
+                size_t maxBytes;
+                uint8_t *raw =
+                    JS_GetArrayBuffer(ctx, &maxBytes, bufferObj.getVal());
+                if (!raw) {
+                    jac::Logger::error(
+                        "Renderer.drawText: Invalid ArrayBuffer passed");
+                    return jac::Value::undefined(ctx);
+                }
+
+                std::string text = args[1].to<std::string>();
+                int x = args[2].to<int>();
+                int y = args[3].to<int>();
+
+                Font *fontPtr = FontProtoBuilder::unwrap(ctx, args[4]);
                 const Font &font =
                     (fontPtr != nullptr) ? *fontPtr : defaultFont;
-                Color color = jac::fromValue<Color>(ctx, colorValue);
+                Color color = jac::fromValue<Color>(ctx, args[5]);
+
+                bool wrap = (args.size() >= 7) ? args[6].to<bool>() : false;
+
+                int format = (args.size() >= 8) ? args[7].to<int>() : 10;
 
                 Pixels &pixels = holder->getScratchPad();
                 pixels.clear();
@@ -844,32 +878,31 @@ class RendererProtoBuilder : public jac::ProtoBuilder::Opaque<RendererHolder>,
                 holder->getRenderer()->drawText(pixels, text, x, y, font, color,
                                                 wrap);
 
-                size_t offset = fb->size;
-
-                uint8_t *raw = fb->data;
-                size_t maxBytes = fb->capacity;
-
+                size_t offset = 0;
                 for (const auto &p : pixels) {
-                    if (offset + 8 > maxBytes) {
-                        jac::Logger::error("Renderer: FrameBuffer overflow");
+                    size_t colorBytesNeeded = (format == 10)  ? 4
+                                              : (format == 9) ? 3
+                                                              : 2;
+                    size_t totalNeeded = 4 + colorBytesNeeded;
+
+                    if (offset + totalNeeded > maxBytes) {
+                        jac::Logger::error(
+                            "Renderer.drawText: ArrayBuffer overflow");
                         break;
                     }
 
                     int16_t px = (int16_t)p.x;
                     raw[offset++] = px & 0xFF;
                     raw[offset++] = (px >> 8) & 0xFF;
+
                     int16_t py = (int16_t)p.y;
                     raw[offset++] = py & 0xFF;
                     raw[offset++] = (py >> 8) & 0xFF;
-                    raw[offset++] = p.color.r;
-                    raw[offset++] = p.color.g;
-                    raw[offset++] = p.color.b;
-                    raw[offset++] = (uint8_t)(p.color.a * 255);
+
+                    offset += packColor(&raw[offset], p.color, format);
                 }
 
-                fb->size = offset;
-
-                return jac::Value::undefined(ctx);
+                return jac::Value(ctx, static_cast<int>(offset));
             }),
             jac::PropFlags::Enumerable);
     }
@@ -891,7 +924,6 @@ template <class Next> class RendererFeature : public Next {
     using LineSegmentClass = jac::Class<LineSegmentProtoBuilder>;
     using PointClass = jac::Class<PointProtoBuilder>;
     using RegularPolygonClass = jac::Class<RegularPolygonProtoBuilder>;
-    using FrameBufferClass = jac::Class<FrameBufferProtoBuilder>;
     using FontClass = jac::Class<FontProtoBuilder>;
     using TextureClass = jac::Class<TextureProtoBuilder>;
 
@@ -909,7 +941,6 @@ template <class Next> class RendererFeature : public Next {
         RegularPolygonClass::init("RegularPolygon");
 
         FontClass::init("Font");
-        FrameBufferClass::init("FrameBuffer");
         TextureClass::init("Texture");
 
         using ShapePB = ShapeProtoBuilder;
@@ -949,8 +980,5 @@ template <class Next> class RendererFeature : public Next {
         shapesModule.addExport(
             "RegularPolygon",
             RegularPolygonClass::getConstructor(this->context()));
-
-        rendererModule.addExport(
-            "FrameBuffer", FrameBufferClass::getConstructor(this->context()));
     }
 };
