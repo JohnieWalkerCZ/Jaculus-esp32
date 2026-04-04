@@ -15,16 +15,15 @@
 template<>
 struct jac::ConvTraits<Rgb> {
     static Value to(ContextRef ctx, Rgb val) {
-        auto obj = Object::create(ctx);
-        obj.set<int>("r", val.r);
-        obj.set<int>("g", val.g);
-        obj.set<int>("b", val.b);
-        return obj;
+        return Value::from(ctx, val.value);
     }
 
     static Rgb from(ContextRef ctx, ValueWeak val) {
-        auto obj = val.to<Object>();
-        return Rgb(obj.get<int>("r"), obj.get<int>("g"), obj.get<int>("b"));
+        if (!val.isNumber()) {
+            throw std::runtime_error("Expected a number");
+        }
+        uint32_t value = val.to<uint32_t>();
+        return Rgb((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF);
     }
 };
 

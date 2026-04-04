@@ -1,5 +1,6 @@
-import { SmartLed, Rgb, LED_WS2812 } from "smartled";
+import { SmartLed, LED_WS2812 } from "smartled";
 import * as gpio from "gpio";
+import { rgb } from "./smartledColor.js";
 
 /**
  * A simple Snake game.
@@ -28,8 +29,8 @@ else if (PlatformInfo.name == "ESP32-S3") {
     var MIDDLE = 9;
 }
 
-const FOOD_COLOR = { r: 255, g: 0, b: 0 };
-const SNAKE_COLOR = { r: 0, g: 255, b: 0 };
+const FOOD_COLOR = rgb(255, 0, 0);
+const SNAKE_COLOR = rgb(0, 255, 0);
 
 gpio.pinMode(POWER_PIN, gpio.PinMode.OUTPUT);
 gpio.write(POWER_PIN, 1);
@@ -39,8 +40,11 @@ for (let pin of [UP, DOWN, LEFT, RIGHT, MIDDLE]) {
 }
 
 let strip = new SmartLed(LED_PIN, 100, LED_WS2812);
-function set(x: number, y: number, color: Rgb, brightness: number = 0.2) {
-    strip.set(x + y * 10, { r: color.r * brightness, g: color.g * brightness, b: color.b * brightness });
+function set(x: number, y: number, color: number, brightness: number = 0.2) {
+    const r = (color >> 16) & 0xff;
+    const g = (color >> 8) & 0xff;
+    const b = color & 0xff;
+    strip.set(x + y * 10, rgb(r * brightness, g * brightness, b * brightness));
 }
 
 let snake = [
@@ -85,7 +89,7 @@ gpio.on("falling", RIGHT, () => {
 let blinkState = true;
 function blinkSnake() {
     for (let pos of snake) {
-        set(pos.x, pos.y, blinkState ? SNAKE_COLOR : { r: 0, g: 0, b: 0 });
+        set(pos.x, pos.y, blinkState ? SNAKE_COLOR : 0);
     }
     strip.show();
     blinkState = !blinkState;
@@ -121,7 +125,7 @@ function step() {
     }
     else {
         let last = snake.pop();
-        set(last.x, last.y, { r: 0, g: 0, b: 0 });
+        set(last.x, last.y, 0);
     }
     set(next.x, next.y, SNAKE_COLOR);
     strip.show();

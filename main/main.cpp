@@ -1,7 +1,7 @@
 #include <jac/features/basicStreamFeature.h>
 #include <jac/features/eventLoopFeature.h>
 #include <jac/features/filesystemFeature.h>
-#include <jac/features/moduleLoaderFeature.h>
+#include <jac/features/nodeModuleLoaderFeature.h>
 #include <jac/features/stdioFeature.h>
 #include <jac/features/timersFeature.h>
 #include <jac/machine/machine.h>
@@ -79,7 +79,7 @@ using Machine = jac::ComposeMachine<
     PlatformInfoFeature,
     jac::EventLoopFeature,
     jac::FilesystemFeature,
-    jac::ModuleLoaderFeature,
+    jac::NodeModuleLoaderFeature,
     jac::TimersFeature,
     TimestampFeature,
     ExtendLifetimeFeature,
@@ -245,14 +245,16 @@ int main() {
             &JsEspMallocFunctions<MALLOC_CAP_DEFAULT>::js_esp_malloc_functions);
 
         esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
-        cfg.stack_size = 2 * 1024;
+        cfg.stack_size = 4 * 1024;
         cfg.inherit_cfg = true;
+        cfg.thread_name = "work";
         esp_pthread_set_cfg(&cfg);
     });
 
     esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
     cfg.stack_size = 10 * 1024;
     cfg.inherit_cfg = true;
+    cfg.thread_name = "device";
     esp_pthread_set_cfg(&cfg);
 
     device.start();
@@ -286,7 +288,7 @@ int main() {
     }
 
     if (startMachine) {
-        device.startMachine("index.js");
+        device.startMachine("");
     }
 }
 

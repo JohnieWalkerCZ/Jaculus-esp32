@@ -1,5 +1,6 @@
-import { SmartLed, Rgb, LED_WS2812 } from "smartled";
+import { SmartLed, LED_WS2812 } from "smartled";
 import * as gpio from "gpio";
+import { rgb } from "./smartledColor.js";
 
 /**
  * A simple Gomoku game.
@@ -54,18 +55,21 @@ for (let i = 0; i < 10; i++) {
     }
 }
 
-function set(x: number, y: number, color: Rgb, brightness: number = 0.1) {
+function set(x: number, y: number, color: number, brightness: number = 0.1) {
     brightness /= 4;
-    strip.set(x + y * 10, { r: color.r * brightness, g: color.g * brightness, b: color.b * brightness });
+    const r = (color >> 16) & 0xff;
+    const g = (color >> 8) & 0xff;
+    const b = color & 0xff;
+    strip.set(x + y * 10, rgb(r * brightness, g * brightness, b * brightness));
 }
 
-let colors: Rgb[] = [
-    { r: 0, g: 0, b: 0 },
-    { r: 255, g: 0, b: 0 },
-    { r: 0, g: 0, b: 255 }
+let colors: number[] = [
+    rgb(0, 0, 0),
+    rgb(255, 0, 0),
+    rgb(0, 0, 255)
 ];
 
-set(0, 0, { r: 0, g: 255, b: 0 });
+set(0, 0, rgb(0, 255, 0));
 strip.show();
 
 let turnRed = true;
@@ -113,7 +117,7 @@ function gameEnd(pos: Pos): { color: number, direction: number[], posCount: numb
 
 function update(oldPos: Pos, newPos: Pos) {
     set(oldPos.x, oldPos.y, colors[matrix[oldPos.x][oldPos.y]]);
-    set(newPos.x, newPos.y, { r: 0, g: 255, b: 0 });
+    set(newPos.x, newPos.y, rgb(0, 255, 0));
     strip.show();
     pos = newPos;
 }

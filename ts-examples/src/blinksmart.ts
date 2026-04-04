@@ -1,4 +1,5 @@
 import { SmartLed } from "smartled";
+import { rgb } from "./smartledColor.js";
 
 /**
  * This example blinks using a smart LED on pin 48.
@@ -12,10 +13,10 @@ let state = false;
 
 setInterval(() => {
     if (state) {
-        strip.set(0, { r: 0, g: 0, b: 0 });
+        strip.set(0, rgb(0, 0, 0));
     }
     else {
-        strip.set(0, { r: 20, g: 0, b: 0 });
+        strip.set(0, rgb(20, 0, 0));
     }
     strip.show();
 
