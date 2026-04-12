@@ -1,3 +1,4 @@
+// https://419.ecma-international.org/3.0/index.html#-15-display-class-pattern-pixel-format-values
 export enum Format {
     MONOCHROME = 3,
     GRAYSCALE_4_BIT = 4,
