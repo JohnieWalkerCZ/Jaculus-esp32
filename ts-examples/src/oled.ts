@@ -13,7 +13,7 @@ const PIN_SDA = 14;
 const PIN_SCL = 13;
 
 const MAX_PIXELS = PANEL_WIDTH * PANEL_HEIGHT;
-const BUFFER_SIZE_BYTES = MAX_PIXELS * 5;
+const BUFFER_SIZE_BYTES = MAX_PIXELS;
 
 function sendCommands(address: number, commands: number[]) {
     const payload = new Uint8Array([0x00, ...commands]);
@@ -43,9 +43,8 @@ export async function shapeExample() {
     initOLED(ADDR_RIGHT);
 
     const renderer = new Renderer(PANEL_WIDTH, PANEL_HEIGHT);
-    const renderBuffer = new ArrayBuffer(BUFFER_SIZE_BYTES);
+    const renderBuffer = new Uint8Array(BUFFER_SIZE_BYTES);
     const oledBuffer = new Uint8Array(1024);
-    const view = new DataView(renderBuffer);
 
     const scene = new Collection({ x: 0, y: 0, color: [0, 0, 0, 1] });
 
@@ -79,24 +78,22 @@ export async function shapeExample() {
     console.log("Starting Monochrome OLED Render Loop (5-bytes per pixel)...");
 
     while (true) {
-        const bytesWritten = renderer.render(scene, renderBuffer, true, Format.MONOCHROME);
+        renderer.render(scene, renderBuffer.buffer, true, Format.MONOCHROME);
 
         oledBuffer.fill(0);
 
-        // [X_lo, X_hi, Y_lo, Y_hi, Mono_Color]
-        for (let i = 0; i < bytesWritten; i += 5) {
-            const x = view.getInt16(i, true);
-            const y = view.getInt16(i + 2, true);
-            const color = view.getUint8(i + 4);
-
-            if (x >= 0 && x < PANEL_WIDTH && y >= 0 && y < PANEL_HEIGHT) {
-                if (color === 1) {
-                    const page = Math.floor(y / 8);
-                    const bit = y % 8;
-                    const bufferIndex = x + (page * PANEL_WIDTH);
-
-                    oledBuffer[bufferIndex] |= (1 << bit);
+        for (let y = 0; y < PANEL_HEIGHT; y++) {
+            for (let x = 0; x < PANEL_WIDTH; x++) {
+                const color = renderBuffer[x + y * PANEL_WIDTH];
+                if (color !== 1) {
+                    continue;
                 }
+
+                const page = Math.floor(y / 8);
+                const bit = y % 8;
+                const bufferIndex = x + (page * PANEL_WIDTH);
+
+                oledBuffer[bufferIndex] |= (1 << bit);
             }
         }
 

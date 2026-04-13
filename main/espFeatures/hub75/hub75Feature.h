@@ -202,38 +202,19 @@ class Hub75Holder : public IDisplayHolder {
         if (!m_initialized || !m_current_frame_buffer)
             return;
 
-        memset(m_pixel_is_set, 0, m_buffer_count);
+        DisplayColor black{0, 0, 0, 0};
+        size_t colorBytes = DisplayUtils::unpackColor(rawData, format, black);
+        if (colorBytes == 0)
+            return;
 
-        size_t byteIdx = 0;
-        while (byteIdx < size) {
-            if (byteIdx + 4 > size)
-                break;
-            int16_t x =
-                (int16_t)(rawData[byteIdx] | (rawData[byteIdx + 1] << 8));
-            int16_t y =
-                (int16_t)(rawData[byteIdx + 2] | (rawData[byteIdx + 3] << 8));
-            byteIdx += 4;
-
-            DisplayColor c;
-            size_t colorBytes =
-                DisplayUtils::unpackColor(&rawData[byteIdx], format, c);
-            if (colorBytes == 0 || byteIdx + colorBytes > size)
-                break;
-            byteIdx += colorBytes;
-
-            if (isValidCoordinate(x, y)) {
-                int index = y * m_width + x;
-                m_current_frame_buffer[index] = c;
-                m_pixel_is_set[index] = 1;
-            }
-        }
+        size_t expectedSize = m_buffer_count * colorBytes;
+        if (size < expectedSize)
+            return;
 
         for (int i = 0; i < m_buffer_count; ++i) {
-            DisplayColor black{0, 0, 0, 0};
-            DisplayColor new_color =
-                m_pixel_is_set[i]
-                    ? m_current_frame_buffer[i]
-                    : (clearPrevious ? black : m_previousBuffer[i]);
+            DisplayColor new_color = clearPrevious ? black : m_previousBuffer[i];
+            DisplayUtils::unpackColor(&rawData[i * colorBytes], format,
+                                      new_color);
 
             if (m_previousBuffer[i] != new_color) {
                 int y = i / m_width;

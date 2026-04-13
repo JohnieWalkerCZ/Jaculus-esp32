@@ -16,7 +16,7 @@ const PANEL_WIDTH = 64;
 const PANEL_HEIGHT = 64;
 
 const MAX_PIXELS = PANEL_WIDTH * PANEL_HEIGHT;
-const BUFFER_SIZE_BYTES = MAX_PIXELS * 9;
+const BUFFER_SIZE_BYTES = MAX_PIXELS * 4;
 
 export async function shapeExample() {
     const display = new Hub75(PANEL_WIDTH, PANEL_HEIGHT);
@@ -121,7 +121,7 @@ export async function shapeExample() {
         // Render scene to buffer, capturing the exact amount of bytes written
         const bytesWritten = renderer.render(scene, buffer);
 
-        display.setBuffer(buffer, bytesWritten, 10, true);
+        display.setBuffer(buffer, bytesWritten, Format.RGBA_888, true);
 
         await sleep(100);
     }
@@ -205,7 +205,7 @@ export async function solarSystemExample() {
 
         const bytesWritten = renderer.render(sunCollection, buffer);
 
-        display.setBuffer(buffer, bytesWritten, 10, true);
+        display.setBuffer(buffer, bytesWritten, Format.RGBA_888, true);
         await sleep(1);
     }
 }
@@ -261,7 +261,7 @@ export async function collisionExample() {
         }
 
         const bytesWritten = renderer.render(mainCollection, buffer);
-        display.setBuffer(buffer, bytesWritten, 10, true);
+        display.setBuffer(buffer, bytesWritten, Format.RGBA_888, true);
 
         await sleep(100);
     }
@@ -287,7 +287,7 @@ async function textExample() {
         );
 
         // Push to display AND clear the previous frame (true)
-        display.setBuffer(buffer, bytesWritten, 10, true);
+        display.setBuffer(buffer, bytesWritten, Format.RGBA_888, true);
 
         // 2. Draw Numbers in Blue
         bytesWritten = renderer.drawText(
@@ -299,7 +299,7 @@ async function textExample() {
             true
         );
         // Push to display, but DO NOT clear the previous letters (false)
-        display.setBuffer(buffer, bytesWritten, 10, false);
+        display.setBuffer(buffer, bytesWritten, Format.RGBA_888, false);
 
         // 3. Draw "abcdefghijklmnopqrstuvwxyz" in Green
         bytesWritten = renderer.drawText(
@@ -311,7 +311,7 @@ async function textExample() {
             true
         );
         // Push to display, DO NOT clear (false)
-        display.setBuffer(buffer, bytesWritten, 10, false);
+        display.setBuffer(buffer, bytesWritten, Format.RGBA_888, false);
 
         console.log("Displayed Alphabet and Numbers.");
 
@@ -327,7 +327,7 @@ async function textExample() {
             true
         );
         console.log("Displaying Symbols...");
-        display.setBuffer(buffer, bytesWritten, 10, true);
+        display.setBuffer(buffer, bytesWritten, Format.RGBA_888, true);
         await sleep(1000);
     }
 }
@@ -375,7 +375,7 @@ async function textureExample() {
 async function main() {
     // Uncomment the example you want to run
     // await shapeExample();
-    // await solarSystemExample();
+    await solarSystemExample();
     // await collisionExample();
     // await textExample();
     // await textureExample();

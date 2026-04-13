@@ -6,7 +6,7 @@ import { Format } from './constants.js';
 const PANEL_WIDTH = 64;
 const PANEL_HEIGHT = 64;
 const MAX_PIXELS = PANEL_WIDTH * PANEL_HEIGHT;
-const BUFFER_SIZE_BYTES = MAX_PIXELS * 9;
+const BUFFER_SIZE_BYTES = MAX_PIXELS * 3;
 
 const PIN_SCK = 13;
 const PIN_MOSI = 11;

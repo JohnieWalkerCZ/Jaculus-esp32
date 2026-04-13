@@ -86,6 +86,49 @@ size_t packColor(uint8_t *raw, const Color &p, int format) {
     }
 }
 
+size_t packedColorSize(int format) {
+    switch (format) {
+    case 3:
+    case 4:
+    case 5:
+    case 6:
+        return 1;
+    case 7:
+    case 8:
+    case 12:
+        return 2;
+    case 9:
+        return 3;
+    case 10:
+        return 4;
+    default:
+        return 0;
+    }
+}
+
+size_t writeDenseFramebuffer(uint8_t *raw, size_t maxBytes, int width, int height,
+                             int format, const Pixels &pixels) {
+    size_t bytesPerPixel = packedColorSize(format);
+    if (bytesPerPixel == 0)
+        return 0;
+
+    size_t frameBytes = static_cast<size_t>(width) * static_cast<size_t>(height) * bytesPerPixel;
+    if (frameBytes > maxBytes)
+        return 0;
+
+    memset(raw, 0, frameBytes);
+
+    for (const auto &p : pixels) {
+        if (p.x < 0 || p.x >= width || p.y < 0 || p.y >= height)
+            continue;
+
+        size_t offset = (static_cast<size_t>(p.y) * static_cast<size_t>(width) + static_cast<size_t>(p.x)) * bytesPerPixel;
+        packColor(&raw[offset], p.color, format);
+    }
+
+    return frameBytes;
+}
+
 // ===================================
 //      Type Conversions (ConvTraits)
 // ===================================
@@ -806,29 +849,14 @@ class RendererProtoBuilder : public jac::ProtoBuilder::Opaque<RendererHolder>,
                 holder->getRenderer()->render(pixels, {*collectionPtr},
                                               {w, h, antialias});
 
-                size_t offset = 0;
-
-                for (const auto &p : pixels) {
-                    size_t colorBytesNeeded = (format == 10)  ? 4
-                                              : (format == 9) ? 3
-                                                              : 2;
-                    int positionBytesNeeded = 4;
-
-                    if (offset + positionBytesNeeded + colorBytesNeeded >
-                        maxBytes)
-                        break;
-
-                    int16_t x = (int16_t)p.x;
-                    raw[offset++] = x & 0xFF;
-                    raw[offset++] = (x >> 8) & 0xFF;
-                    int16_t y = (int16_t)p.y;
-                    raw[offset++] = y & 0xFF;
-                    raw[offset++] = (y >> 8) & 0xFF;
-
-                    offset += packColor(&raw[offset], p.color, format);
+                size_t frameBytes =
+                    writeDenseFramebuffer(raw, maxBytes, w, h, format, pixels);
+                if (frameBytes == 0) {
+                    jac::Logger::error("Renderer.render: ArrayBuffer too small or invalid format");
+                    return jac::Value::undefined(ctx);
                 }
 
-                return jac::Value(ctx, static_cast<int>(offset));
+                return jac::Value(ctx, static_cast<int>(frameBytes));
             }),
             jac::PropFlags::Enumerable);
 
@@ -878,31 +906,16 @@ class RendererProtoBuilder : public jac::ProtoBuilder::Opaque<RendererHolder>,
                 holder->getRenderer()->drawText(pixels, text, x, y, font, color,
                                                 wrap);
 
-                size_t offset = 0;
-                for (const auto &p : pixels) {
-                    size_t colorBytesNeeded = (format == 10)  ? 4
-                                              : (format == 9) ? 3
-                                                              : 2;
-                    size_t totalNeeded = 4 + colorBytesNeeded;
-
-                    if (offset + totalNeeded > maxBytes) {
-                        jac::Logger::error(
-                            "Renderer.drawText: ArrayBuffer overflow");
-                        break;
-                    }
-
-                    int16_t px = (int16_t)p.x;
-                    raw[offset++] = px & 0xFF;
-                    raw[offset++] = (px >> 8) & 0xFF;
-
-                    int16_t py = (int16_t)p.y;
-                    raw[offset++] = py & 0xFF;
-                    raw[offset++] = (py >> 8) & 0xFF;
-
-                    offset += packColor(&raw[offset], p.color, format);
+                size_t frameBytes = writeDenseFramebuffer(
+                    raw, maxBytes, holder->getWidth(), holder->getHeight(),
+                    format, pixels);
+                if (frameBytes == 0) {
+                    jac::Logger::error(
+                        "Renderer.drawText: ArrayBuffer too small or invalid format");
+                    return jac::Value::undefined(ctx);
                 }
 
-                return jac::Value(ctx, static_cast<int>(offset));
+                return jac::Value(ctx, static_cast<int>(frameBytes));
             }),
             jac::PropFlags::Enumerable);
     }
