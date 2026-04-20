@@ -7,6 +7,6 @@ export enum Format {
     RGB_565_LITTLE = 7,
     RGB_565_BIG = 8,
     RGB_888 = 9,
-    RGBA_888 = 10,
+    RGBA_8888 = 10,
     XRGB = 12,
 }

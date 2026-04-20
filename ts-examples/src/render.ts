@@ -121,7 +121,7 @@ export async function shapeExample() {
         // Render scene to buffer, capturing the exact amount of bytes written
         const bytesWritten = renderer.render(scene, buffer);
 
-        display.setBuffer(buffer, bytesWritten, Format.RGBA_888, true);
+        display.setBuffer(buffer, bytesWritten, Format.RGBA_8888, true);
 
         await sleep(100);
     }
@@ -205,7 +205,7 @@ export async function solarSystemExample() {
 
         const bytesWritten = renderer.render(sunCollection, buffer);
 
-        display.setBuffer(buffer, bytesWritten, Format.RGBA_888, true);
+        display.setBuffer(buffer, bytesWritten, Format.RGBA_8888, true);
         await sleep(1);
     }
 }
@@ -261,7 +261,7 @@ export async function collisionExample() {
         }
 
         const bytesWritten = renderer.render(mainCollection, buffer);
-        display.setBuffer(buffer, bytesWritten, Format.RGBA_888, true);
+        display.setBuffer(buffer, bytesWritten, Format.RGBA_8888, true);
 
         await sleep(100);
     }
@@ -287,7 +287,7 @@ async function textExample() {
         );
 
         // Push to display AND clear the previous frame (true)
-        display.setBuffer(buffer, bytesWritten, Format.RGBA_888, true);
+        display.setBuffer(buffer, bytesWritten, Format.RGBA_8888, true);
 
         // 2. Draw Numbers in Blue
         bytesWritten = renderer.drawText(
@@ -299,7 +299,7 @@ async function textExample() {
             true
         );
         // Push to display, but DO NOT clear the previous letters (false)
-        display.setBuffer(buffer, bytesWritten, Format.RGBA_888, false);
+        display.setBuffer(buffer, bytesWritten, Format.RGBA_8888, false);
 
         // 3. Draw "abcdefghijklmnopqrstuvwxyz" in Green
         bytesWritten = renderer.drawText(
@@ -311,7 +311,7 @@ async function textExample() {
             true
         );
         // Push to display, DO NOT clear (false)
-        display.setBuffer(buffer, bytesWritten, Format.RGBA_888, false);
+        display.setBuffer(buffer, bytesWritten, Format.RGBA_8888, false);
 
         console.log("Displayed Alphabet and Numbers.");
 
@@ -327,7 +327,7 @@ async function textExample() {
             true
         );
         console.log("Displaying Symbols...");
-        display.setBuffer(buffer, bytesWritten, Format.RGBA_888, true);
+        display.setBuffer(buffer, bytesWritten, Format.RGBA_8888, true);
         await sleep(1000);
     }
 }

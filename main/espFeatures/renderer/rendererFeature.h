@@ -11,8 +11,8 @@
 #include "Renderer.hpp"
 #include "Shape.hpp"
 #include "Utils.hpp"
+#include "esp_cpu.h"
 #include "esp_heap_caps.h"
-#include "esp_timer.h"
 #include "jac/device/logger.h"
 #include "jac/machine/context.h"
 #include "jac/machine/internal/declarations.h"
@@ -106,26 +106,35 @@ size_t packedColorSize(int format) {
     }
 }
 
-size_t writeDenseFramebuffer(uint8_t *raw, size_t maxBytes, int width, int height,
-                             int format, const Pixels &pixels) {
+size_t writeDenseFramebuffer(uint8_t *raw, size_t maxBytes, int width,
+                             int height, int format,
+                             const Display &displayGrid) {
     size_t bytesPerPixel = packedColorSize(format);
     if (bytesPerPixel == 0)
         return 0;
 
-    size_t frameBytes = static_cast<size_t>(width) * static_cast<size_t>(height) * bytesPerPixel;
+    size_t frameBytes = static_cast<size_t>(width) *
+                        static_cast<size_t>(height) * bytesPerPixel;
     if (frameBytes > maxBytes)
         return 0;
 
-    memset(raw, 0, frameBytes);
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            size_t offset =
+                (static_cast<size_t>(y) * static_cast<size_t>(width) +
+                 static_cast<size_t>(x)) *
+                bytesPerPixel;
 
-    for (const auto &p : pixels) {
-        if (p.x < 0 || p.x >= width || p.y < 0 || p.y >= height)
-            continue;
-
-        size_t offset = (static_cast<size_t>(p.y) * static_cast<size_t>(width) + static_cast<size_t>(p.x)) * bytesPerPixel;
-        packColor(&raw[offset], p.color, format);
+            if (x < displayGrid.width && y < displayGrid.height) {
+                packColor(&raw[offset],
+                          displayGrid.pixels[y * displayGrid.width + x],
+                          format);
+            } else {
+                for (size_t i = 0; i < bytesPerPixel; i++)
+                    raw[offset + i] = 0;
+            }
+        }
     }
-
     return frameBytes;
 }
 
@@ -751,31 +760,6 @@ class FontProtoBuilder : public jac::ProtoBuilder::Opaque<Font>,
             jac::PropFlags::Enumerable);
     }
 };
-class RendererHolder {
-  private:
-    ::Renderer *m_renderer;
-    int m_width;
-    int m_height;
-    Pixels m_scratchPad;
-
-  public:
-    RendererHolder(int width, int height) : m_width(width), m_height(height) {
-        m_renderer = new ::Renderer(width, height);
-        m_scratchPad.reserve(20000);
-    }
-    ~RendererHolder() { delete m_renderer; }
-    ::Renderer *getRenderer() { return m_renderer; }
-    Pixels &getScratchPad() {
-        m_scratchPad.clear();
-        return m_scratchPad;
-    }
-    int getWidth() const { return m_width; }
-    int getHeight() const { return m_height; }
-};
-
-static void freeArrayBuffer(JSRuntime *rt, void *opaque, void *ptr) {
-    free(ptr);
-}
 
 inline void logMemory() {
     size_t internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
@@ -783,6 +767,24 @@ inline void logMemory() {
     jac::Logger::log(std::format("MEM: Internal: {} bytes | PSRAM: {} bytes",
                                  internal, spirit));
 }
+
+class RendererHolder {
+  private:
+    ::Renderer *m_renderer;
+    int m_width;
+    int m_height;
+
+  public:
+    RendererHolder(int width, int height) : m_width(width), m_height(height) {
+        logMemory();
+        m_renderer = new ::Renderer(width, height);
+        logMemory();
+    }
+    ~RendererHolder() { delete m_renderer; }
+    ::Renderer *getRenderer() { return m_renderer; }
+    int getWidth() const { return m_width; }
+    int getHeight() const { return m_height; }
+};
 
 class RendererProtoBuilder : public jac::ProtoBuilder::Opaque<RendererHolder>,
                              public jac::ProtoBuilder::Properties {
@@ -844,15 +846,19 @@ class RendererProtoBuilder : public jac::ProtoBuilder::Opaque<RendererHolder>,
 
                 int w = holder->getWidth();
                 int h = holder->getHeight();
-                Pixels &pixels = holder->getScratchPad();
-
-                holder->getRenderer()->render(pixels, {*collectionPtr},
+                holder->getRenderer()->clear();
+                holder->getRenderer()->render({*collectionPtr},
                                               {w, h, antialias});
 
-                size_t frameBytes =
-                    writeDenseFramebuffer(raw, maxBytes, w, h, format, pixels);
+                const Display &displayGrid =
+                    holder->getRenderer()->getDisplayGrid();
+
+                size_t frameBytes = writeDenseFramebuffer(raw, maxBytes, w, h,
+                                                          format, displayGrid);
+
                 if (frameBytes == 0) {
-                    jac::Logger::error("Renderer.render: ArrayBuffer too small or invalid format");
+                    jac::Logger::error("Renderer.render: ArrayBuffer too small "
+                                       "or invalid format");
                     return jac::Value::undefined(ctx);
                 }
 
@@ -900,18 +906,18 @@ class RendererProtoBuilder : public jac::ProtoBuilder::Opaque<RendererHolder>,
 
                 int format = (args.size() >= 8) ? args[7].to<int>() : 10;
 
-                Pixels &pixels = holder->getScratchPad();
-                pixels.clear();
+                holder->getRenderer()->drawText(text, x, y, font, color, wrap);
 
-                holder->getRenderer()->drawText(pixels, text, x, y, font, color,
-                                                wrap);
+                const Display &displayGrid =
+                    holder->getRenderer()->getDisplayGrid();
 
                 size_t frameBytes = writeDenseFramebuffer(
                     raw, maxBytes, holder->getWidth(), holder->getHeight(),
-                    format, pixels);
+                    format, displayGrid);
+
                 if (frameBytes == 0) {
-                    jac::Logger::error(
-                        "Renderer.drawText: ArrayBuffer too small or invalid format");
+                    jac::Logger::error("Renderer.drawText: ArrayBuffer too "
+                                       "small or invalid format");
                     return jac::Value::undefined(ctx);
                 }
 
