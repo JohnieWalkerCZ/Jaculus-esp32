@@ -6,7 +6,7 @@ import { Format } from './constants.js';
 const PANEL_WIDTH = 64;
 const PANEL_HEIGHT = 64;
 const MAX_PIXELS = PANEL_WIDTH * PANEL_HEIGHT;
-const BUFFER_SIZE_BYTES = MAX_PIXELS * 2;
+const BUFFER_SIZE_BYTES = MAX_PIXELS * 3;
 
 const PIN_SCK = 3;
 const PIN_CS = 1;
@@ -48,7 +48,7 @@ function buildModesetBuffer() {
 
     view.setUint8(0, MODE_MAGIC);
     view.setUint8(1, 0);
-    view.setUint8(2, Format.RGB_565_LITTLE);
+    view.setUint8(2, Format.RGB_888);
     view.setUint8(3, 255);
     view.setUint16(4, PANEL_WIDTH, true);
 
@@ -141,11 +141,10 @@ export async function solarSystemExample() {
     while (true) {
         earthCollection.rotate(1.5);
         moonCollection.rotate(3);
-        renderer.render(sunCollection, renderBuffer, true, Format.RGB_565_LITTLE);
+        renderer.render(sunCollection, renderBuffer, true, Format.RGB_888);
         sendRpHub75Frame(syncBuffer, modesetBuffer, renderBuffer);
-
         angle += 0.15;
-        await sleep(10);
+        await sleep(1);
     }
 }
 
@@ -178,8 +177,8 @@ export async function rpHub75SpiExample() {
     try {
         setupSpi();
 
-        const renderBuffer = new Uint8Array(64 * 64 * 2);
-        const view = new DataView(renderBuffer.buffer);
+        const renderBuffer = new ArrayBuffer(64 * 64 * 2);
+        const view = new DataView(renderBuffer);
 
         const syncBuffer = buildSyncBuffer();
         const modesetBuffer = buildModesetBuffer();
@@ -209,3 +208,5 @@ export async function rpHub75SpiExample() {
         console.log(e);
     }
 }
+
+solarSystemExample();

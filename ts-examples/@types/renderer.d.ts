@@ -26,7 +26,7 @@ declare module "shapes" {
 
         /**
          * Rotate the shape around its current pivot.
-         * @param angle The angle in radians.
+         * @param angle The angle in degrees.
          */
         rotate(angle: number): void;
 
@@ -84,7 +84,7 @@ declare module "shapes" {
 
         /**
          * Rotate texture sampling coordinates.
-         * @param rotation The angle in radians.
+         * @param rotation The angle in degrees.
          */
         setTextureRotation(rotation: number): void;
 
@@ -104,7 +104,7 @@ declare module "shapes" {
 
         /**
          * Set the current rotation angle directly.
-         * @param angle The angle in radians.
+         * @param angle The angle in degrees.
          */
         setRotationAngle(angle: number): void;
 
@@ -146,7 +146,7 @@ declare module "shapes" {
 
         /**
          * Set the UV rotation.
-         * @param rotation The angle in radians.
+         * @param rotation The angle in degrees.
          */
         setUVRotation(rotation: number): void;
 
@@ -176,7 +176,7 @@ declare module "shapes" {
 
         /**
          * Get the current rotation angle.
-         * @returns The current angle in radians.
+         * @returns The current angle in degrees.
          */
         getRotationAngle(): number;
 
