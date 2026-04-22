@@ -27,10 +27,15 @@
 
 // Reference:
 // https://419.ecma-international.org/3.0/index.html#-15-display-class-pattern-pixel-format-values
-size_t packColor(uint8_t *raw, const Color &p, int format) {
+size_t packColor(uint8_t *raw, const Color &p, int format, bool antialias) {
     uint8_t r = p.r;
     uint8_t g = p.g;
     uint8_t b = p.b;
+    if (antialias) {
+        r = (uint8_t)r * p.a;
+        g = (uint8_t)g * p.a;
+        b = (uint8_t)b * p.a;
+    }
     uint8_t a = (uint8_t)(p.a * 255);
 
     switch (format) {
@@ -70,9 +75,9 @@ size_t packColor(uint8_t *raw, const Color &p, int format) {
         return 3;
     }
     case 10: { // 32-bit RGBA 8:8:8:8
-        raw[0] = r;
-        raw[1] = g;
-        raw[2] = b;
+        raw[0] = p.r;
+        raw[1] = p.g;
+        raw[2] = p.b;
         raw[3] = a;
         return 4;
     }
@@ -107,7 +112,7 @@ size_t packedColorSize(int format) {
 }
 
 size_t writeDenseFramebuffer(uint8_t *raw, size_t maxBytes, int width,
-                             int height, int format,
+                             int height, int format, bool antialias,
                              const Display &displayGrid) {
     size_t bytesPerPixel = packedColorSize(format);
     if (bytesPerPixel == 0)
@@ -127,8 +132,8 @@ size_t writeDenseFramebuffer(uint8_t *raw, size_t maxBytes, int width,
 
             if (x < displayGrid.width && y < displayGrid.height) {
                 packColor(&raw[offset],
-                          displayGrid.pixels[y * displayGrid.width + x],
-                          format);
+                          displayGrid.pixels[y * displayGrid.width + x], format,
+                          antialias);
             } else {
                 for (size_t i = 0; i < bytesPerPixel; i++)
                     raw[offset + i] = 0;
@@ -853,8 +858,8 @@ class RendererProtoBuilder : public jac::ProtoBuilder::Opaque<RendererHolder>,
                 const Display &displayGrid =
                     holder->getRenderer()->getDisplayGrid();
 
-                size_t frameBytes = writeDenseFramebuffer(raw, maxBytes, w, h,
-                                                          format, displayGrid);
+                size_t frameBytes = writeDenseFramebuffer(
+                    raw, maxBytes, w, h, format, antialias, displayGrid);
 
                 if (frameBytes == 0) {
                     jac::Logger::error("Renderer.render: ArrayBuffer too small "
@@ -913,7 +918,7 @@ class RendererProtoBuilder : public jac::ProtoBuilder::Opaque<RendererHolder>,
 
                 size_t frameBytes = writeDenseFramebuffer(
                     raw, maxBytes, holder->getWidth(), holder->getHeight(),
-                    format, displayGrid);
+                    format, false, displayGrid);
 
                 if (frameBytes == 0) {
                     jac::Logger::error("Renderer.drawText: ArrayBuffer too "
