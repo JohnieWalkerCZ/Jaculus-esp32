@@ -12,13 +12,14 @@ idf_component_register(
     REQUIRES jac-dcore jac-machine jac-link
              driver pthread spiffs vfs fatfs
              SmartLeds esp_timer Esp32-RBGridUI
-			 ESP32-HUB75-MatrixPanel-DMA
-             renderer esp_timer
+             renderer
 )
 
 target_compile_definitions(${COMPONENT_LIB} PUBLIC NO_GFX)
 
 target_compile_definitions(${COMPONENT_LIB} PRIVATE JAC_ESP32_VERSION="${JAC_ESP32_VERSION}" SPIRAM_DMA_BUFFER)
+
+target_compile_options(${COMPONENT_LIB} PRIVATE "-mtext-section-literals")
 
 target_compile_options(${COMPONENT_LIB} PRIVATE "-mtext-section-literals")
 

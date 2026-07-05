@@ -6,7 +6,7 @@ dependencies:
     path: src
   simple-radio:
     git: https://github.com/RoboticsBrno/Esp32-simple-radio.git
-    version: v1.2.2
+    version: v2.1.2
   SmartLeds:
     git: https://github.com/RoboticsBrno/SmartLeds.git
     version: v3.1.6
@@ -17,9 +17,6 @@ dependencies:
     git: https://github.com/RoboticsBrno/Esp32-DCMotor.git
     version: v1.0.1
     path: lib
-  ESP32-HUB75-MatrixPanel-DMA:
-    git: https://github.com/mrcodetastic/ESP32-HUB75-MatrixPanel-DMA.git
-    version: master 
   renderer:
     git: https://github.com/RoboticsBrno/2D-renderer-cpp.git
-    version: 1.1.3
+    version: 1.1.4

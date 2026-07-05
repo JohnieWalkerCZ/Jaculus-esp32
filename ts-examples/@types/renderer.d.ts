@@ -358,7 +358,7 @@ declare module "renderer" {
          * @param rotation Rotates the whole image by 90 degree increments.
          * @returns The number of bytes written.
          */
-        render(scene: Collection, buffer: ArrayBuffer, antialias?: boolean, format?: import("../src/constants.js").Format, rotation?: number): number;
+        render(scene: Collection, buffer: ArrayBuffer, antialias?: boolean, format?: Format, rotation?: number): number;
 
         /**
          * Draw text into the provided buffer.
@@ -373,6 +373,19 @@ declare module "renderer" {
          * @param rotation Rotates the whole image by 90 degree increments.
          * @returns The number of bytes written.
          */
-        drawText(buffer: ArrayBuffer, text: string, x: number, y: number, font: Font, color: Color, wrap: boolean, format?: import("../src/constants.js").Format, rotation?: number): number;
+        drawText(buffer: ArrayBuffer, text: string, x: number, y: number, font: Font, color: Color, wrap: boolean, format?: Format, rotation?: number): number;
+    }
+
+    // https://419.ecma-international.org/3.0/index.html#-15-display-class-pattern-pixel-format-values
+    export enum Format {
+        MONOCHROME = 3,
+        GRAYSCALE_4_BIT = 4,
+        GRAYSCALE_8_BIT = 5,
+        RGB_332 = 6,
+        RGB_565_LITTLE = 7,
+        RGB_565_BIG = 8,
+        RGB_888 = 9,
+        RGBA_8888 = 10,
+        XRGB = 12,
     }
 }
