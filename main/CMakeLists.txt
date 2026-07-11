@@ -1,4 +1,4 @@
-set(JAC_ESP32_VERSION "0.1.1")
+set(JAC_ESP32_VERSION "0.2.1")
 
 idf_component_register(
     SRCS "main.cpp" 
@@ -22,6 +22,10 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE JAC_ESP32_VERSION="${JAC_ESP
 target_compile_options(${COMPONENT_LIB} PRIVATE "-mtext-section-literals")
 
 target_compile_options(${COMPONENT_LIB} PRIVATE "-mtext-section-literals")
+
+if(IDF_TARGET STREQUAL "esp32" OR IDF_TARGET STREQUAL "esp32s3")
+    target_compile_options(${COMPONENT_LIB} PRIVATE "-mtext-section-literals")
+endif()
 
 add_subdirectory(resources)
 target_link_libraries(${COMPONENT_LIB} PRIVATE resources)

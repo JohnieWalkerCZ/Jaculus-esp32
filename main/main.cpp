@@ -23,12 +23,14 @@
 #include "espFeatures/hub75/hub75Feature.h"
 #include "espFeatures/i2cFeature.h"
 #include "espFeatures/raycasterFeature.h"
+#include "espFeatures/oneWireFeature.h"
 #include "espFeatures/spiFeature.h"
-#include "espFeatures/ledcFeature.h"
+#include "espFeatures/pwmFeature.h"
 #include "espFeatures/motorFeature.h"
 #include "espFeatures/pulseCounterFeature.h"
 #include "espFeatures/rendererFeature.h"
 #include "espFeatures/selectFeature.h"
+#include "espFeatures/serialFeature.h"
 #include "espFeatures/simpleRadioFeature.h"
 #include "espFeatures/smartLedFeature.h"
 #include "espFeatures/timestampFeature.h"
@@ -86,12 +88,14 @@ using Machine = jac::ComposeMachine<
     ExtendLifetimeFeature,
     ConvertFeature,
     GpioFeature,
-    LedcFeature,
+    PwmFeature,
     AdcFeature,
     I2CFeature,
+    OneWireFeature,
     SPIFeature,
     SmartLedFeature,
     PulseCounterFeature,
+    SerialFeature,
     SimpleRadioFeature,
     MotorFeature,
     WifiFeature,
