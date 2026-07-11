@@ -182,14 +182,14 @@ export async function runAsteroids(startSpi: boolean) {
         }
 
         // --- 3. Render Frame ---
-        const scene = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255] });
+        const scene = new Collection({ x: 0, y: 0 });
 
         // Draw Asteroids (Hexagons)
         for (let a of asteroids) {
             scene.add(new RegularPolygon({
                 x: a.x, y: a.y,
                 sides: 6, radius: a.r,
-                color: [100, 100, 255, 255], // Light Blue
+                color: 0x6464ff, // Light Blue
                 fill: false,
             }));
         }
@@ -199,7 +199,7 @@ export async function runAsteroids(startSpi: boolean) {
             scene.add(new Circle({
                 x: b.x, y: b.y,
                 radius: 1,
-                color: [255, 255, 0, 255], // Yellow
+                color: 0xffff00, // Yellow
                 fill: true
             }));
         }
@@ -210,7 +210,7 @@ export async function runAsteroids(startSpi: boolean) {
             x: player.x,
             y: player.y,
             vertices: [[3, 0], [-2, -2], [-2, 2]],
-            color: [0, 255, 0, 255], // Green
+            color: 0x00ff00, // Green
             fill: true
         });
 

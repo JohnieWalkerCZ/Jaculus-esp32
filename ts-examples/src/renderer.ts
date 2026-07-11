@@ -15,24 +15,24 @@ export async function solarSystemExample() {
     const syncBuffer = buildSyncBuffer();
     const modesetBuffer = buildModesetBuffer(PANEL_WIDTH, Format.RGB_888);
 
-    const sunCollection = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255], z: 0 });
+    const sunCollection = new Collection({ x: 0, y: 0, z: 0 });
     sunCollection.setPivot(32, 32);
 
     const sun = new Circle({
         x: 32, y: 32,
         radius: 8,
-        color: [255, 255, 0, 255],
+        color: 0xffff00,
         fill: true
     });
     sunCollection.add(sun);
 
-    const earthCollection = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255], z: 5 });
+    const earthCollection = new Collection({ x: 0, y: 0, z: 5 });
     earthCollection.setPivot(32, 32);
 
     const earth = new Circle({
         x: 32 + 20, y: 32,
         radius: 4,
-        color: [0, 150, 255, 255],
+        color: 0x0096ff,
         fill: true,
         z: 10
     });
@@ -41,19 +41,19 @@ export async function solarSystemExample() {
     const alien = new Circle({
         x: 32 - 20, y: 32,
         radius: 4,
-        color: [0, 255, 100, 255],
+        color: 0x00ff64,
         fill: true,
         z: 10
     });
     earthCollection.add(alien);
 
-    const moonCollection = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255], z: 10 });
+    const moonCollection = new Collection({ x: 0, y: 0, z: 10 });
     moonCollection.setPivot(52, 32);
 
     const moon = new Circle({
         x: 32 + 20 + 8, y: 32,
         radius: 2,
-        color: [200, 200, 200, 255],
+        color: 0xc8c8c8,
         fill: true,
         z: 10
     });
@@ -65,7 +65,7 @@ export async function solarSystemExample() {
     const earthOrbit = new Circle({
         x: 32, y: 32,
         radius: 20,
-        color: [100, 100, 100, 255],
+        color: 0x646464,
         fill: false,
         z: 1
     });
@@ -74,7 +74,7 @@ export async function solarSystemExample() {
     const moonOrbit = new Circle({
         x: 32 + 20, y: 32,
         radius: 8,
-        color: [100, 100, 100, 255],
+        color: 0x646464,
         fill: false,
         z: 1
     });
@@ -137,8 +137,16 @@ export async function textExample() {
     const syncBuffer = buildSyncBuffer();
     const modesetBuffer = buildModesetBuffer(PANEL_WIDTH, Format.RGB_888);
 
+    const scene = new Collection({ x: 0, y: 0, z: 10 });
+    const rect = new Rectangle({ x: 0, y: 0, width: 21, height: 8, color: 0x222222, fill: true });
+    scene.add(rect);
+
     while (true) {
-        renderer.drawText(renderBuffer, "Testing baf, test, #!%$@", 0, 0, font, [255, 0, 0, 255], true, Format.RGB_888, -1);
+        renderer.render(scene, renderBuffer, true, Format.RGB_888, 0);
+        renderer.drawText(renderBuffer, "rot0", 0, 0, font, 0xff0000, false, Format.RGB_888, 0);
+        renderer.drawText(renderBuffer, "rot1", 0, 0, font, 0x00ff00, false, Format.RGB_888, 1);
+        renderer.drawText(renderBuffer, "rot2", 0, 0, font, 0x0000ff, false, Format.RGB_888, 2);
+        renderer.drawText(renderBuffer, "rot3", 0, 0, font, 0xffff00, false, Format.RGB_888, 3);
         sendRpHub75Frame(syncBuffer, modesetBuffer, renderBuffer);
         await sleep(1);
     }
@@ -161,17 +169,56 @@ export async function textureExample() {
         console.log("Failed to load texture BMP");
     }
 
-    const scene = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255], z: 0 });
-    const rect = new Rectangle({ x: 30, y: 30, width: 30, height: 25, color: [12, 54, 160, 255], fill: true });
+    const scene = new Collection({ x: 0, y: 0, z: 0 });
+    const rect = new Rectangle({ x: 30, y: 30, width: 30, height: 25, color: 0xFFFFFF, fill: true });
     rect.setTexture(texture);
     rect.setTextureScale(2, 2);
-    rect.setFixTexture(true);
     scene.add(rect);
 
     while (true) {
         rect.rotate(1);
         renderer.render(scene, renderBuffer, true, Format.RGB_888, -1);
         sendRpHub75Frame(syncBuffer, modesetBuffer, renderBuffer);
+        await sleep(1);
+    }
+}
+
+export async function removeExample() {
+    setupSpi();
+
+    const renderer = new Renderer(PANEL_WIDTH, PANEL_HEIGHT);
+    const renderBuffer = new ArrayBuffer(BUFFER_SIZE_BYTES);
+    const syncBuffer = buildSyncBuffer();
+    const modesetBuffer = buildModesetBuffer(PANEL_WIDTH, Format.RGB_888);
+
+    const scene = new Collection({ x: 0, y: 0, z: 0 });
+
+    const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff];
+    const circles = colors.map((color, i) => new Circle({
+        x: 10 + i * 11, y: 32,
+        radius: 5,
+        color,
+        fill: true
+    }));
+    circles.forEach(circle => scene.add(circle));
+
+    let frame = 0;
+    let next = 0;
+
+    while (true) {
+        if (frame > 0 && frame % 20 === 0) {
+            if (next < circles.length) {
+                scene.remove(circles[next]);
+                next++;
+            } else {
+                circles.forEach(circle => scene.add(circle));
+                next = 0;
+            }
+        }
+
+        renderer.render(scene, renderBuffer, true, Format.RGB_888);
+        sendRpHub75Frame(syncBuffer, modesetBuffer, renderBuffer);
+        frame++;
         await sleep(1);
     }
 }

@@ -17,24 +17,24 @@ export async function solarSystemExample() {
     const syncBuffer = buildSyncBuffer();
     const modesetBuffer = buildModesetBuffer(PANEL_WIDTH, Format.RGB_888);
 
-    const sunCollection = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255], z: 0 });
+    const sunCollection = new Collection({ x: 0, y: 0, z: 0 });
     sunCollection.setPivot(32, 32);
 
     const sun = new Circle({
         x: 32, y: 32,
         radius: 8,
-        color: [255, 255, 0, 255],
+        color: 0xffff00,
         fill: true
     });
     sunCollection.add(sun);
 
-    const earthCollection = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255], z: 5 });
+    const earthCollection = new Collection({ x: 0, y: 0, z: 5 });
     earthCollection.setPivot(32, 32);
 
     const earth = new Circle({
         x: 32 + 20, y: 32,
         radius: 4,
-        color: [0, 150, 255, 255],
+        color: 0x0096ff,
         fill: true,
         z: 10
     });
@@ -43,19 +43,19 @@ export async function solarSystemExample() {
     const alien = new Circle({
         x: 32 - 20, y: 32,
         radius: 4,
-        color: [0, 255, 100, 255],
+        color: 0x00ff64,
         fill: true,
         z: 10
     });
     earthCollection.add(alien);
 
-    const moonCollection = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255], z: 10 });
+    const moonCollection = new Collection({ x: 0, y: 0, z: 10 });
     moonCollection.setPivot(52, 32);
 
     const moon = new Circle({
         x: 32 + 20 + 8, y: 32,
         radius: 2,
-        color: [200, 200, 200, 255],
+        color: 0xc8c8c8,
         fill: true,
         z: 10
     });
@@ -67,7 +67,7 @@ export async function solarSystemExample() {
     const earthOrbit = new Circle({
         x: 32, y: 32,
         radius: 20,
-        color: [100, 100, 100, 255],
+        color: 0x646464,
         fill: false,
         z: 1
     });
@@ -76,7 +76,7 @@ export async function solarSystemExample() {
     const moonOrbit = new Circle({
         x: 32 + 20, y: 32,
         radius: 8,
-        color: [100, 100, 100, 255],
+        color: 0x646464,
         fill: false,
         z: 1
     });
@@ -103,10 +103,10 @@ export async function rotatedGridExample() {
     const syncBuffer = buildSyncBuffer();
     const modesetBuffer = buildModesetBuffer(PANEL_WIDTH, Format.RGB_888);
 
-    const scene = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255], z: 0 });
+    const scene = new Collection({ x: 0, y: 0, z: 0 });
     for (let i = 0; i < 14; i++) {
         for (let j = 0; j < 5; j++) {
-            let rect = new Rectangle({ x: i * 5, y: j * 5, width: 4, height: 4, color: [12, 54, 160, 255], fill: true });
+            let rect = new Rectangle({ x: i * 5, y: j * 5, width: 4, height: 4, color: 0x0c36a0, fill: true });
             rect.rotate(30);
             scene.add(rect);
         }
@@ -127,10 +127,10 @@ export async function gridExample() {
     const syncBuffer = buildSyncBuffer();
     const modesetBuffer = buildModesetBuffer(PANEL_WIDTH, Format.RGB_888);
 
-    const scene = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255], z: 0 });
+    const scene = new Collection({ x: 0, y: 0, z: 0 });
     for (let i = 0; i < 16; i++) {
         for (let j = 0; j < 16; j++) {
-            let rect = new Rectangle({ x: i * 4, y: j * 4, width: 3, height: 3, color: [12, 54, 160, 255] });
+            let rect = new Rectangle({ x: i * 4, y: j * 4, width: 3, height: 3, color: 0x0c36a0 });
             scene.add(rect);
         }
     }
@@ -151,8 +151,8 @@ export async function rectExample() {
     const syncBuffer = buildSyncBuffer();
     const modesetBuffer = buildModesetBuffer(PANEL_WIDTH, Format.RGB_888);
 
-    const scene = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255], z: 0 });
-    const rect = new Rectangle({ x: 0, y: 0, width: 64, height: 64, color: [255, 255, 255, 255], fill: true });
+    const scene = new Collection({ x: 0, y: 0, z: 0 });
+    const rect = new Rectangle({ x: 0, y: 0, width: 64, height: 64, color: 0xffffff, fill: true });
     scene.add(rect);
 
 
@@ -211,7 +211,7 @@ export async function textExample() {
     const modesetBuffer = buildModesetBuffer(PANEL_WIDTH, Format.RGB_888);
 
     while (true) {
-        renderer.drawText(renderBuffer, "Testing baf, test, #!%$@", 0, 0, font, [255, 0, 0, 255], true, Format.RGB_888, -1);
+        renderer.drawText(renderBuffer, "Testing baf, test, #!%$@", 0, 0, font, 0xff0000, true, Format.RGB_888, -1);
         sendRpHub75Frame(syncBuffer, modesetBuffer, renderBuffer);
         await sleep(1);
     }
@@ -234,8 +234,8 @@ export async function textureExample() {
         console.log("Failed to load texture BMP");
     }
 
-    const scene = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255], z: 0 });
-    const rect = new Rectangle({ x: 30, y: 30, width: 30, height: 25, color: [12, 54, 160, 255], fill: true });
+    const scene = new Collection({ x: 0, y: 0, z: 0 });
+    const rect = new Rectangle({ x: 30, y: 30, width: 30, height: 25, color: 0x0c36a0, fill: true });
     rect.setTexture(texture);
     rect.setTextureScale(2, 2);
     rect.setFixTexture(true);
@@ -255,11 +255,11 @@ async function generatedScene() {
     const renderBuffer = new ArrayBuffer(64 * 64 * 3);
     const syncBuffer = buildSyncBuffer();
     const modesetBuffer = buildModesetBuffer(64, Format.RGB_888);
-    const scene = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255] });
+    const scene = new Collection({ x: 0, y: 0 });
 
     const rectangle_d3t = new Rectangle({
         x: 24, y: 20,
-        color: [241, 9, 6, 255],
+        color: 0xf10906,
         width: 26, height: 16,
         fill: true
     });

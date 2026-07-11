@@ -25,14 +25,14 @@ adc.configure(AIM_Y);
 const CENTER = 512;
 const DEADZONE = 200;
 
-// --- COLOR CONSTANTS (Avoid creating arrays every frame) ---
-const COLOR_HIDDEN: Color = [50, 50, 50, 255]
-const COLOR_REVEALED: Color = [180, 180, 180, 255]
-const COLOR_MINE: Color = [255, 0, 0, 255]
-const COLOR_FLAG: Color = [255, 255, 0, 255]
-const COLOR_CURSOR: Color = [255, 255, 255, 255]
-const COLOR_TEXT_NUM: Color = [0, 255, 0, 255]
-const COLOR_TEXT_MSG: Color = [0, 255, 0, 255]
+// --- COLOR CONSTANTS ---
+const COLOR_HIDDEN: Color = 0x323232
+const COLOR_REVEALED: Color = 0xb4b4b4
+const COLOR_MINE: Color = 0xff0000
+const COLOR_FLAG: Color = 0xffff00
+const COLOR_CURSOR: Color = 0xffffff
+const COLOR_TEXT_NUM: Color = 0x00ff00
+const COLOR_TEXT_MSG: Color = 0x00ff00
 
 // --- INPUT UTILITIES ---
 function getStickVector(pinX, pinY) {
@@ -156,7 +156,7 @@ export async function runMinesweeper(startSpi: boolean) {
     const modesetBuffer = buildModesetBuffer(PANEL_WIDTH, Format.RGB_565_LITTLE);
 
     // --- ONE-TIME SCENE SETUP ---
-    scene = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255] });
+    scene = new Collection({ x: 0, y: 0 });
     cellShapes = [];
     for (let y = 0; y < GRID_SIZE; y++) {
         const row: Rectangle[] = [];

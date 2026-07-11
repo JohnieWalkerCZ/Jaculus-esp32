@@ -50,7 +50,7 @@ export async function runDoom(startSpi: boolean) {
     const modesetBuffer = buildModesetBuffer(PANEL_WIDTH, Format.RGB_565_LITTLE);
 
     // We reuse this scene object every frame to avoid massive memory garbage collection
-    const scene = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255] });
+    const scene = new Collection({ x: 0, y: 0 });
 
     while (gpio.read(7)) {
         // --- 1. INPUT & MOVEMENT ---
@@ -142,15 +142,18 @@ export async function runDoom(startSpi: boolean) {
             let drawEnd = lineHeight / 2 + PANEL_HEIGHT / 2;
             if (drawEnd >= PANEL_HEIGHT) drawEnd = PANEL_HEIGHT - 1;
 
-            let wallColor;
+            let wallColor: number;
             let tile = worldMap[mapX][mapY];
-            if (tile === 1) wallColor = [0, 0, 200, 255];       // Blue
-            else if (tile === 2) wallColor = [200, 0, 0, 255];  // Red
-            else if (tile === 3) wallColor = [0, 200, 0, 255];  // Green
-            else wallColor = [200, 200, 200, 255];
+            if (tile === 1) wallColor = 0x0000c8;       // Blue
+            else if (tile === 2) wallColor = 0xc80000;  // Red
+            else if (tile === 3) wallColor = 0x00c800;  // Green
+            else wallColor = 0xc8c8c8;
 
             if (side === 1) {
-                wallColor = [wallColor[0] / 2, wallColor[1] / 2, wallColor[2] / 2, 255];
+                // Halve each channel to shade the darker-facing wall side
+                wallColor = ((wallColor >> 16 & 0xff) >> 1) << 16
+                    | ((wallColor >> 8 & 0xff) >> 1) << 8
+                    | ((wallColor & 0xff) >> 1);
             }
 
             scene.add(new Rectangle({

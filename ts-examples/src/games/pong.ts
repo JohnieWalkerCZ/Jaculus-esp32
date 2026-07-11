@@ -137,7 +137,7 @@ export async function runPong(setup: boolean) {
         }
 
         // --- 2. Render Scene ---
-        const scene = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255] }); // Black background
+        const scene = new Collection({ x: 0, y: 0 }); // Black background
 
         // Draw Center Net (Dotted Line)
         for (let i = 0; i < PANEL_HEIGHT; i += 4) {
@@ -146,7 +146,7 @@ export async function runPong(setup: boolean) {
                 y: i,
                 width: 1,
                 height: 2,
-                color: [100, 100, 100, 255],
+                color: 0x646464,
                 fill: true
             }));
         }
@@ -157,7 +157,7 @@ export async function runPong(setup: boolean) {
             y: p1.y,
             width: PADDLE_W,
             height: PADDLE_H,
-            color: [50, 150, 255, 255],
+            color: 0x3296ff,
             fill: true
         }));
 
@@ -167,7 +167,7 @@ export async function runPong(setup: boolean) {
             y: p2.y,
             width: PADDLE_W,
             height: PADDLE_H,
-            color: [255, 50, 50, 255],
+            color: 0xff3232,
             fill: true
         }));
 
@@ -177,7 +177,7 @@ export async function runPong(setup: boolean) {
             y: ball.y,
             width: BALL_SIZE,
             height: BALL_SIZE,
-            color: [255, 255, 255, 255],
+            color: 0xffffff,
             fill: true
         }));
 
@@ -190,7 +190,7 @@ export async function runPong(setup: boolean) {
             p1.score.toString(),
             Math.floor(PANEL_WIDTH / 4), 2,
             font,
-            [50, 150, 255, 255],
+            0x3296ff,
             false,
             Format.RGB_888,
             -1
@@ -201,7 +201,7 @@ export async function runPong(setup: boolean) {
             p2.score.toString(),
             Math.floor((PANEL_WIDTH / 4) * 3) - 4, 2,
             font,
-            [255, 50, 50, 255],
+            0xff3232,
             false,
             Format.RGB_888,
             -1

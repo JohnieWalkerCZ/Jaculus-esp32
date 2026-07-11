@@ -82,7 +82,7 @@ export async function runSnake(startSpi: boolean) {
         }
 
         // --- 2. Render Frame ---
-        const scene = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255] });
+        const scene = new Collection({ x: 0, y: 0 });
 
         for (let pos of snake) {
             scene.add(new Rectangle({
@@ -90,7 +90,7 @@ export async function runSnake(startSpi: boolean) {
                 y: pos.y * CELL_SIZE,
                 width: CELL_SIZE - 1,
                 height: CELL_SIZE - 1,
-                color: [0, 255, 0, 255],
+                color: 0x00ff00,
                 fill: true
             }));
         }
@@ -100,7 +100,7 @@ export async function runSnake(startSpi: boolean) {
             y: food.y * CELL_SIZE,
             width: CELL_SIZE,
             height: CELL_SIZE,
-            color: [255, 0, 0, 255],
+            color: 0xff0000,
             fill: true
         }));
 

@@ -23,15 +23,23 @@ adc.configure(ADC_Y);
 const DEADZONE = 300;
 
 // --- GAME DATA ---
-const TETROMINOES: { shape: number[][], color: [number, number, number, number] }[] = [
-    { shape: [[1, 1, 1, 1]], color: [0, 255, 255, 255] },         // I - Cyan
-    { shape: [[1, 0, 0], [1, 1, 1]], color: [0, 0, 255, 255] },   // J - Blue
-    { shape: [[0, 0, 1], [1, 1, 1]], color: [255, 165, 0, 255] }, // L - Orange
-    { shape: [[1, 1], [1, 1]], color: [255, 255, 0, 255] },       // O - Yellow
-    { shape: [[0, 1, 1], [1, 1, 0]], color: [0, 255, 0, 255] },   // S - Green
-    { shape: [[0, 1, 0], [1, 1, 1]], color: [128, 0, 128, 255] }, // T - Purple
-    { shape: [[1, 1, 0], [0, 1, 1]], color: [255, 0, 0, 255] }    // Z - Red
+const TETROMINOES: { shape: number[][], color: number }[] = [
+    { shape: [[1, 1, 1, 1]], color: 0x00ffff },         // I - Cyan
+    { shape: [[1, 0, 0], [1, 1, 1]], color: 0x0000ff },   // J - Blue
+    { shape: [[0, 0, 1], [1, 1, 1]], color: 0xffa500 }, // L - Orange
+    { shape: [[1, 1], [1, 1]], color: 0xffff00 },       // O - Yellow
+    { shape: [[0, 1, 1], [1, 1, 0]], color: 0x00ff00 },   // S - Green
+    { shape: [[0, 1, 0], [1, 1, 1]], color: 0x800080 }, // T - Purple
+    { shape: [[1, 1, 0], [0, 1, 1]], color: 0xff0000 }    // Z - Red
 ];
+
+// Dim each channel of a packed color by the given factor (0-1)
+function dimColor(color: number, factor: number): number {
+    const r = Math.floor(((color >> 16) & 0xff) * factor);
+    const g = Math.floor(((color >> 8) & 0xff) * factor);
+    const b = Math.floor((color & 0xff) * factor);
+    return (r << 16) | (g << 8) | b;
+}
 
 const font = new Font();
 
@@ -84,7 +92,7 @@ function spawnPiece() {
     currentPiece = {
         shape: template.shape,
         color: c,
-        ghostColor: [Math.floor(c[0] * 0.4), Math.floor(c[1] * 0.4), Math.floor(c[2] * 0.4), 255],
+        ghostColor: dimColor(c, 0.4),
         x: Math.floor(COLS / 2) - Math.floor(template.shape[0].length / 2),
         y: 0
     };
@@ -255,13 +263,13 @@ export async function runTetris(startSpi: boolean) {
 
         // --- 2. Render Frame (Only if state changed) ---
         if (needsRender) {
-            const scene = new Collection({ x: 0, y: 0, color: [0, 0, 0, 255] });
+            const scene = new Collection({ x: 0, y: 0 });
 
             // Main Board Border
             scene.add(new Rectangle({
                 x: OFFSET_X - 1, y: OFFSET_Y - 1,
                 width: (COLS * CELL_SIZE) + 2, height: (ROWS * CELL_SIZE) + 2,
-                color: [50, 50, 50, 255], fill: false
+                color: 0x323232, fill: false
             }));
 
             // Static blocks
@@ -335,7 +343,7 @@ export async function runTetris(startSpi: boolean) {
                 score.toString(),
                 2, 2,
                 font,
-                [255, 255, 255, 255],
+                0xffffff,
                 false,
                 Format.RGB_565_LITTLE,
                 -1

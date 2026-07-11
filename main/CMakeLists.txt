@@ -7,8 +7,7 @@ idf_component_register(
         "espFeatures/gridui/gridUiFeature.cpp" 
         "espFeatures/gridui/widgets/_common.cpp"
         "espFeatures/renderer/rendererFeature.cpp"
-        "espFeatures/hub75/hub75Feature.cpp"
-    INCLUDE_DIRS "" "espFeatures/hub75"
+    INCLUDE_DIRS ""
     REQUIRES jac-dcore jac-machine jac-link
              driver pthread spiffs vfs fatfs
              SmartLeds esp_timer Esp32-RBGridUI
