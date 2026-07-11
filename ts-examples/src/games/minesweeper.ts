@@ -2,8 +2,9 @@ import { Renderer, Font } from 'renderer';
 import { Collection, Color, Rectangle } from 'shapes';
 import { Format } from '../constants.js';
 import * as adc from "adc";
-import * as gpio from "gpio";
+import { running, standalone } from "./gameExit.js";
 import { buildModesetBuffer, buildSyncBuffer, sendRpHub75Frame, setupSpi } from '../spiSender.js';
+import { STICK1_X, STICK1_Y, STICK2_X, STICK2_Y } from '../pins.js';
 
 // --- CONFIGURATION ---
 const PANEL_WIDTH = 64;
@@ -12,10 +13,10 @@ const GRID_SIZE = 8;
 const CELL_SIZE = PANEL_WIDTH / GRID_SIZE;
 
 // --- HARDWARE CONFIG ---
-const MOVE_X = 4;
-const MOVE_Y = 5;
-const AIM_X = 16;
-const AIM_Y = 15;
+const MOVE_X = STICK1_X;
+const MOVE_Y = STICK1_Y;
+const AIM_X = STICK2_X;
+const AIM_Y = STICK2_Y;
 
 adc.configure(MOVE_X);
 adc.configure(MOVE_Y);
@@ -27,12 +28,24 @@ const DEADZONE = 200;
 
 // --- COLOR CONSTANTS ---
 const COLOR_HIDDEN: Color = 0x323232
-const COLOR_REVEALED: Color = 0xb4b4b4
+const COLOR_REVEALED: Color = 0xe0e0e0
 const COLOR_MINE: Color = 0xff0000
 const COLOR_FLAG: Color = 0xffff00
-const COLOR_CURSOR: Color = 0xffffff
-const COLOR_TEXT_NUM: Color = 0x00ff00
+const COLOR_CURSOR: Color = 0xff00ff
 const COLOR_TEXT_MSG: Color = 0x00ff00
+
+// Classic minesweeper per-count colors, chosen for contrast against COLOR_REVEALED
+const NUMBER_COLORS: Color[] = [
+    0x000000, // 0 (unused)
+    0x0000ff, // 1 blue
+    0x008000, // 2 green
+    0xff0000, // 3 red
+    0x000080, // 4 dark blue
+    0x800000, // 5 dark red/maroon
+    0x008080, // 6 teal
+    0x000000, // 7 black
+    0x404040, // 8 dark gray
+];
 
 // --- INPUT UTILITIES ---
 function getStickVector(pinX, pinY) {
@@ -73,6 +86,7 @@ let actionCooldown = 0;
 let scene: Collection;
 let cellShapes: Rectangle[][] = [];
 let cursorShape: Rectangle;
+let cursorShapeInner: Rectangle;
 
 function initGame() {
     status = 'PLAYING';
@@ -146,7 +160,7 @@ function checkWin() {
     return true;
 }
 
-export async function runMinesweeper(startSpi: boolean) {
+export async function runMinesweeper(startSpi: boolean = true) {
     if (startSpi) { setupSpi(); }
 
     const renderer = new Renderer(PANEL_WIDTH, PANEL_HEIGHT);
@@ -181,11 +195,19 @@ export async function runMinesweeper(startSpi: boolean) {
         color: COLOR_CURSOR,
         fill: false
     });
+    cursorShapeInner = new Rectangle({
+        x: 0, y: 0,
+        width: CELL_SIZE - 1,
+        height: CELL_SIZE - 1,
+        color: COLOR_CURSOR,
+        fill: false
+    });
     scene.add(cursorShape);
+    scene.add(cursorShapeInner);
 
     initGame();
 
-    while (gpio.read(7)) {
+    while (running()) {
         // --- 1. Handle Input ---
         const moveInput = getStickVector(MOVE_X, MOVE_Y);
         const aimInput = getStickVector(AIM_X, AIM_Y);
@@ -235,6 +257,7 @@ export async function runMinesweeper(startSpi: boolean) {
         }
 
         cursorShape.setPosition(cursor.x * CELL_SIZE - 1, cursor.y * CELL_SIZE - 1);
+        cursorShapeInner.setPosition(cursor.x * CELL_SIZE + 1, cursor.y * CELL_SIZE + 1);
 
         // Render the existing scene
         renderer.render(scene, renderBuffer, true, Format.RGB_565_LITTLE, -1);
@@ -251,7 +274,7 @@ export async function runMinesweeper(startSpi: boolean) {
                             x * CELL_SIZE + 2,
                             y * CELL_SIZE,
                             font,
-                            COLOR_TEXT_NUM,
+                            NUMBER_COLORS[cell.neighborMines],
                             false,
                             Format.RGB_565_LITTLE,
                             -1
@@ -268,3 +291,5 @@ export async function runMinesweeper(startSpi: boolean) {
         await sleep(10);
     }
 }
+
+if (standalone()) runMinesweeper();

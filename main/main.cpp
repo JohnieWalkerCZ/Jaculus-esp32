@@ -20,7 +20,6 @@
 #include "espFeatures/freeRTOSEventQueue.h"
 #include "espFeatures/gpioFeature.h"
 #include "espFeatures/gridui/gridUiFeature.h"
-#include "espFeatures/hub75/hub75Feature.h"
 #include "espFeatures/i2cFeature.h"
 #include "espFeatures/raycasterFeature.h"
 #include "espFeatures/oneWireFeature.h"
@@ -250,7 +249,10 @@ int main() {
             &JsEspMallocFunctions<MALLOC_CAP_DEFAULT>::js_esp_malloc_functions);
 
         esp_pthread_cfg_t cfg = esp_pthread_get_default_config();
-        cfg.stack_size = 4 * 1024;
+        // ponytail: 4KB was too tight for quickjs's recursive parser once module
+        // graphs got deeper (game_menu -> games -> renderer/shapes); it was
+        // silently corrupting the heap (bad_alloc / hangs). Bump if that recurs.
+        cfg.stack_size = 16 * 1024;
         cfg.inherit_cfg = true;
         cfg.thread_name = "work";
         esp_pthread_set_cfg(&cfg);

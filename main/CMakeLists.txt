@@ -6,7 +6,6 @@ idf_component_register(
         "platform/espNvsKeyValue.cpp"
         "espFeatures/gridui/gridUiFeature.cpp" 
         "espFeatures/gridui/widgets/_common.cpp"
-        "espFeatures/renderer/rendererFeature.cpp"
     INCLUDE_DIRS ""
     REQUIRES jac-dcore jac-machine jac-link
              driver pthread spiffs vfs fatfs

@@ -2,18 +2,19 @@ import { Renderer } from 'renderer';
 import { Collection, Polygon, Circle, RegularPolygon } from 'shapes';
 import { Format } from '../constants.js';
 import * as adc from "adc";
-import * as gpio from "gpio";
+import { running, standalone } from "./gameExit.js";
 import { buildModesetBuffer, buildSyncBuffer, sendRpHub75Frame, setupSpi } from '../spiSender.js';
+import { STICK1_X, STICK1_Y, STICK2_X, STICK2_Y } from '../pins.js';
 
 // --- CONFIGURATION ---
 const PANEL_WIDTH = 64;
 const PANEL_HEIGHT = 64;
 
 // --- HARDWARE CONFIG ---
-const MOVE_X = 4;
-const MOVE_Y = 5;
-const AIM_X = 16;
-const AIM_Y = 15;
+const MOVE_X = STICK1_X;
+const MOVE_Y = STICK1_Y;
+const AIM_X = STICK2_X;
+const AIM_Y = STICK2_Y;
 
 adc.configure(MOVE_X);
 adc.configure(MOVE_Y);
@@ -72,7 +73,7 @@ function resetGame() {
     for (let i = 0; i < 4; i++) spawnAsteroid();
 }
 
-export async function runAsteroids(startSpi: boolean) {
+export async function runAsteroids(startSpi: boolean = true) {
     if (startSpi) { setupSpi(); }
     const renderer = new Renderer(PANEL_WIDTH, PANEL_HEIGHT);
     const renderBuffer = new ArrayBuffer(PANEL_WIDTH * PANEL_HEIGHT * 3);
@@ -84,7 +85,7 @@ export async function runAsteroids(startSpi: boolean) {
 
     resetGame();
 
-    while (gpio.read(7)) {
+    while (running()) {
         let moveInput = { x: 0, y: 0, active: false };
         let aimInput = { x: 0, y: 0, active: false };
 
@@ -222,3 +223,5 @@ export async function runAsteroids(startSpi: boolean) {
         sendRpHub75Frame(syncBuffer, modesetBuffer, renderBuffer);
     }
 }
+
+if (standalone()) runAsteroids();

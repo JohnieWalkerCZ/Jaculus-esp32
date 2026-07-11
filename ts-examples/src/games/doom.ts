@@ -2,16 +2,17 @@ import { Renderer } from 'renderer';
 import { Collection, Rectangle } from 'shapes';
 import { Format } from '../constants.js';
 import * as adc from "adc";
-import * as gpio from "gpio";
+import { running, standalone } from "./gameExit.js";
 import { buildModesetBuffer, buildSyncBuffer, sendRpHub75Frame, setupSpi } from '../spiSender.js';
+import { STICK1_X, STICK1_Y } from '../pins.js';
 
 // --- CONFIGURATION & SPI SETUP ---
 const PANEL_WIDTH = 64;
 const PANEL_HEIGHT = 64;
 
 // Left Joystick for Movement (Y = Forward/Back, X = Turn Left/Right)
-const JOY_X = 4;
-const JOY_Y = 5;
+const JOY_X = STICK1_X;
+const JOY_Y = STICK1_Y;
 
 adc.configure(JOY_X);
 adc.configure(JOY_Y);
@@ -42,7 +43,7 @@ let planeY = 0.66; // FOV adjustment
 const moveSpeed = 0.15;
 const rotSpeed = 0.1;
 
-export async function runDoom(startSpi: boolean) {
+export async function runDoom(startSpi: boolean = true) {
     if (startSpi) { setupSpi(); }
     const renderer = new Renderer(PANEL_WIDTH, PANEL_HEIGHT);
     const renderBuffer = new ArrayBuffer(PANEL_WIDTH * PANEL_HEIGHT * 2);
@@ -52,7 +53,7 @@ export async function runDoom(startSpi: boolean) {
     // We reuse this scene object every frame to avoid massive memory garbage collection
     const scene = new Collection({ x: 0, y: 0 });
 
-    while (gpio.read(7)) {
+    while (running()) {
         // --- 1. INPUT & MOVEMENT ---
         let rawX = adc.read(JOY_X) - CENTER;
         let rawY = adc.read(JOY_Y) - CENTER;
@@ -173,3 +174,5 @@ export async function runDoom(startSpi: boolean) {
         await sleep(1);
     }
 }
+
+if (standalone()) runDoom();

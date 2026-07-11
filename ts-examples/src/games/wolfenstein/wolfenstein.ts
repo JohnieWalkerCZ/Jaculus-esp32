@@ -1,5 +1,5 @@
 import * as adc from "adc";
-import * as gpio from "gpio";
+import { running, standalone } from "../gameExit.js";
 import { Raycaster } from 'raycaster';
 import { Format } from '../../constants.js';
 import {
@@ -333,7 +333,7 @@ async function addTextures(raycaster: Raycaster) {
 // ==========================================
 // MAIN LOOP
 // ==========================================
-export async function runWolfenstein(startSpi: boolean) {
+export async function runWolfenstein(startSpi: boolean = true) {
     if (startSpi) { setupSpi(); }
 
     const raycaster = new Raycaster(PANEL_WIDTH, PANEL_HEIGHT);
@@ -371,7 +371,7 @@ export async function runWolfenstein(startSpi: boolean) {
     const syncBuffer = buildSyncBuffer();
     const modesetBuffer = buildModesetBuffer(PANEL_WIDTH, Format.RGB_565_LITTLE);
 
-    while (gpio.read(7)) {
+    while (running()) {
         // --- 1. INPUT ---
         let rawX = adc.read(JOY_X) - CENTER;
         let rawY = adc.read(JOY_Y) - CENTER;
@@ -401,3 +401,5 @@ export async function runWolfenstein(startSpi: boolean) {
         await sleep(1);
     }
 }
+
+if (standalone()) runWolfenstein();

@@ -2,8 +2,9 @@ import { Renderer } from 'renderer';
 import { Collection, Rectangle } from 'shapes';
 import { Format } from '../constants.js';
 import * as adc from "adc";
-import * as gpio from "gpio";
+import { running, standalone } from "./gameExit.js";
 import { buildModesetBuffer, buildSyncBuffer, sendRpHub75Frame, setupSpi } from '../spiSender.js';
+import { STICK1_X, STICK1_Y } from '../pins.js';
 
 // --- CONFIGURATION ---
 const PANEL_WIDTH = 64;
@@ -11,8 +12,8 @@ const PANEL_HEIGHT = 64;
 const GRID_SIZE = 16;
 const CELL_SIZE = PANEL_WIDTH / GRID_SIZE;
 
-const ADC_X = 4;
-const ADC_Y = 5;
+const ADC_X = STICK1_X;
+const ADC_Y = STICK1_Y;
 adc.configure(ADC_X);
 adc.configure(ADC_Y);
 
@@ -51,7 +52,7 @@ function newFood() {
     };
 }
 
-export async function runSnake(startSpi: boolean) {
+export async function runSnake(startSpi: boolean = true) {
     if (startSpi) { setupSpi(); }
     const renderer = new Renderer(PANEL_WIDTH, PANEL_HEIGHT);
     const renderBuffer = new ArrayBuffer(PANEL_WIDTH * PANEL_HEIGHT * 2);
@@ -61,7 +62,7 @@ export async function runSnake(startSpi: boolean) {
     const FRAME_TIME = 15;
     const POLL_INTERVAL = 1;
 
-    while (gpio.read(7)) {
+    while (running()) {
         // --- 1. Update Logic ---
         let next = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
 
@@ -116,3 +117,5 @@ export async function runSnake(startSpi: boolean) {
         }
     }
 }
+
+if (standalone()) runSnake();

@@ -2,8 +2,9 @@ import { Font, Renderer } from 'renderer';
 import { Collection, Rectangle } from 'shapes';
 import { Format } from '../constants.js';
 import * as adc from "adc";
-import * as gpio from "gpio";
+import { running, standalone } from "./gameExit.js";
 import { buildModesetBuffer, buildSyncBuffer, sendRpHub75Frame, setupSpi } from '../spiSender.js';
+import { STICK1_X, STICK1_Y } from '../pins.js';
 
 // --- CONFIGURATION ---
 const PANEL_WIDTH = 64;
@@ -15,8 +16,8 @@ const CELL_SIZE = 3;
 const OFFSET_X = Math.floor((PANEL_WIDTH - (COLS * CELL_SIZE)) / 2);
 const OFFSET_Y = Math.floor((PANEL_HEIGHT - (ROWS * CELL_SIZE)) / 2);
 
-const ADC_X = 4;
-const ADC_Y = 5;
+const ADC_X = STICK1_X;
+const ADC_Y = STICK1_Y;
 adc.configure(ADC_X);
 adc.configure(ADC_Y);
 
@@ -40,8 +41,6 @@ function dimColor(color: number, factor: number): number {
     const b = Math.floor((color & 0xff) * factor);
     return (r << 16) | (g << 8) | b;
 }
-
-const font = new Font();
 
 let board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
 let currentPiece = null;
@@ -148,8 +147,9 @@ function clearLines() {
     return linesCleared;
 }
 
-export async function runTetris(startSpi: boolean) {
+export async function runTetris(startSpi: boolean = true) {
     if (startSpi) { setupSpi(); }
+    const font = new Font();
     const renderer = new Renderer(PANEL_WIDTH, PANEL_HEIGHT);
     const renderBuffer = new ArrayBuffer(PANEL_WIDTH * PANEL_HEIGHT * 2);
     const syncBuffer = buildSyncBuffer();
@@ -167,7 +167,7 @@ export async function runTetris(startSpi: boolean) {
 
     spawnPiece();
 
-    while (gpio.read(7)) {
+    while (running()) {
         // --- 1. Input & Update Logic ---
         updateJoystickState(joyState);
 
@@ -358,3 +358,5 @@ export async function runTetris(startSpi: boolean) {
         await sleep(POLL_INTERVAL);
     }
 }
+
+if (standalone()) runTetris();

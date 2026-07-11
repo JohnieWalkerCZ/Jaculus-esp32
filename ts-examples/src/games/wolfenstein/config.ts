@@ -1,5 +1,6 @@
 import * as adc from "adc";
 import { EnemyConfig, EnemyEntity, Entity } from "./types";
+import { STICK1_X, STICK1_Y, STICK2_X, STICK2_Y } from '../../pins.js';
 
 export const PALETTE_original: Record<string, number> = {
     // Neutrals
@@ -49,10 +50,10 @@ export const PANEL_WIDTH = 64;
 export const PANEL_HEIGHT = 64;
 
 // Joysticks
-export const JOY_X = 4;
-export const JOY_Y = 5;
-export const JOY_MOVE_X = 15;
-export const JOY_MOVE_Y = 16;
+export const JOY_X = STICK1_X;
+export const JOY_Y = STICK1_Y;
+export const JOY_MOVE_X = STICK2_Y;
+export const JOY_MOVE_Y = STICK2_X;
 
 adc.configure(JOY_X);
 adc.configure(JOY_Y);

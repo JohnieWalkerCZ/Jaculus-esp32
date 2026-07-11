@@ -1,19 +1,17 @@
-import { runPong } from "./pong.js";
-import { runDoom } from "./doom.js";
-import { runTetris } from "./tetris.js";
-import { runAsteroids } from "./asteroids.js";
-import { runSnake } from "./snakeDisplay.js";
-import { runWolfenstein } from "./wolfenstein/wolfenstein.js";
 import { buildModesetBuffer, buildSyncBuffer, sendRpHub75Frame, setupSpi } from "../spiSender.js";
 import { PANEL_HEIGHT, PANEL_WIDTH } from "./wolfenstein/config.js";
 import { Format } from "../constants.js";
 import * as adc from "adc";
-import * as gpio from "gpio";
-import { runMinesweeper } from "./minesweeper.js";
+import { useMenu } from "./gameExit.js";
+import { STICK1_X, STICK1_Y } from '../pins.js';
+
+useMenu();
+
+type GameRunner = (startSpi: boolean) => Promise<void>;
 
 // --- Hardware Constants ---
-const ADC_X = 4;
-const ADC_Y = 5;
+const ADC_X = STICK1_X;
+const ADC_Y = STICK1_Y;
 const DEADZONE = 300;
 
 const SOURCE_ICON_SIZE = 16;
@@ -152,40 +150,59 @@ const ICONS = {
 ................
 ................`,
 
-    // A 3D perspective hallway (Blue walls, gray floor/ceiling)
+    // A round mine with spikes and a flag, plus a red-flagged cell
+    minesweeper: `
+................
+.......W........
+.......W........
+......RRR.......
+.....SSSSS......
+....SSSSSSS.....
+...SwSSSSSwS....
+..SSSSSSSSSSS...
+.wSSSSSSSSSSSw..
+..SSSSSSSSSSS...
+...SwSSSSSwS....
+....SSSSSSS.....
+.....SSSSS......
+......SSS.......
+................
+................`,
+
+    // First-person gun with muzzle flash, classic FPS HUD style
     wolf: `
-bbbbbbbbbbbbbbbb
-bWWWWWWWWWWWWWWb
-bWSSSSSSSSSSSSWb
-bWSssssssssssSWb
-bWSsWWWWWWWWsSWb
-bWSsW......WsSWb
-bWSsW..ss..WsSWb
-bWSsW..ss..WsSWb
-bWSsW..SS..WsSWb
-bWSsW..SS..WsSWb
-bWSsWWWWWWWWsSWb
-bWSssssssssssSWb
-bWSSSSSSSSSSSSWb
-bWWWWWWWWWWWWWWb
-bbbbbbbbbbbbbbbb
+.......YY.......
+......YWWY......
+.......SS.......
+.......SS.......
+.......SS.......
+.......SS.......
+......SSSS......
+......SwwS......
+......SSSS......
+.....SSSSSS.....
+.....SwwwwS.....
+.....SSSSSS.....
+......SSSS......
+......S..S......
+......S..S......
 ................`
 };
 interface GameEntry {
     name: string;
-    run: (startSpi: boolean) => void;
+    load: () => Promise<GameRunner>;
     iconStr: string;
     bakedIcon: Uint16Array | null;
 }
 
 const GAMES: GameEntry[] = [
-    { name: "Pong", run: runPong, iconStr: ICONS.pong, bakedIcon: null },
-    { name: "Minesweeper", run: runMinesweeper, iconStr: ICONS.asteroids, bakedIcon: null },
-    { name: "Doom", run: runDoom, iconStr: ICONS.doom, bakedIcon: null },
-    { name: "Tetris", run: runTetris, iconStr: ICONS.tetris, bakedIcon: null },
-    { name: "Asteroids", run: runAsteroids, iconStr: ICONS.asteroids, bakedIcon: null },
-    { name: "Snake", run: runSnake, iconStr: ICONS.snake, bakedIcon: null },
-    { name: "Wolfenstein3D", run: runWolfenstein, iconStr: ICONS.wolf, bakedIcon: null },
+    { name: "Pong", load: () => import("./pong.js").then(m => m.runPong), iconStr: ICONS.pong, bakedIcon: null },
+    { name: "Minesweeper", load: () => import("./minesweeper.js").then(m => m.runMinesweeper), iconStr: ICONS.minesweeper, bakedIcon: null },
+    { name: "Doom", load: () => import("./doom.js").then(m => m.runDoom), iconStr: ICONS.doom, bakedIcon: null },
+    { name: "Tetris", load: () => import("./tetris.js").then(m => m.runTetris), iconStr: ICONS.tetris, bakedIcon: null },
+    { name: "Asteroids", load: () => import("./asteroids.js").then(m => m.runAsteroids), iconStr: ICONS.asteroids, bakedIcon: null },
+    { name: "Snake", load: () => import("./snakeDisplay.js").then(m => m.runSnake), iconStr: ICONS.snake, bakedIcon: null },
+    { name: "Wolfenstein3D", load: () => import("./wolfenstein/wolfenstein.js").then(m => m.runWolfenstein), iconStr: ICONS.wolf, bakedIcon: null },
 ];
 
 // --- Texture Engine ---
@@ -283,7 +300,6 @@ function drawRotatedRect(x: number, y: number, w: number, h: number, color: numb
 
 async function initAndRun() {
     setupSpi();
-    gpio.pinMode(7, gpio.PinMode.INPUT_PULLUP);
     for (const game of GAMES) {
         const buffer = await bakeTexture(game.iconStr, PALETTE);
         game.bakedIcon = new Uint16Array(buffer);
@@ -309,7 +325,8 @@ async function initAndRun() {
 
         if (rawDir.x === 1) {
             const game = GAMES[selectedIndex];
-            await game.run(false);
+            const run = await game.load();
+            await run(false);
         }
 
         const targetScrollY = (PANEL_HEIGHT / 2) - (DISPLAY_ICON_SIZE / 2) - (selectedIndex * SPACING);

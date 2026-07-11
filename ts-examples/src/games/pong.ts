@@ -3,15 +3,16 @@ import { Collection, Rectangle } from 'shapes';
 import { Format } from '../constants.js';
 import * as adc from "adc";
 import { buildModesetBuffer, buildSyncBuffer, sendRpHub75Frame, setupSpi } from '../spiSender.js';
-import * as gpio from "gpio";
+import { running, standalone } from "./gameExit.js";
+import { STICK1_Y, STICK2_Y } from '../pins.js';
 
 // --- CONFIGURATION ---
 const PANEL_WIDTH = 64;
 const PANEL_HEIGHT = 64;
 
 // --- HARDWARE CONFIG ---
-const P1_Y_PIN = 15; // Left Stick Y
-const P2_Y_PIN = 5; // Right Stick Y
+const P1_Y_PIN = STICK2_Y; // Left Stick Y
+const P2_Y_PIN = STICK1_Y; // Right Stick Y
 
 adc.configure(P1_Y_PIN);
 adc.configure(P2_Y_PIN);
@@ -27,8 +28,6 @@ const BALL_SIZE = 2;
 const MAX_BALL_SPEED = 4;
 const INITIAL_BALL_SPEED = 1.5;
 const INITIAL_PADDLE_SPEED = 2.5;
-
-const font = new Font();
 
 // --- GAME STATE ---
 let p1 = { y: 26, score: 0, speed: INITIAL_PADDLE_SPEED };
@@ -82,8 +81,9 @@ function checkPaddleCollision(paddleX, paddleY, isLeftPaddle) {
 }
 
 // --- MAIN LOOP ---
-export async function runPong(setup: boolean) {
+export async function runPong(setup: boolean = true) {
     if (setup) { setupSpi(); }
+    const font = new Font();
     const renderer = new Renderer(PANEL_WIDTH, PANEL_HEIGHT);
     const renderBuffer = new ArrayBuffer(PANEL_WIDTH * PANEL_HEIGHT * 3);
     const syncBuffer = buildSyncBuffer();
@@ -91,7 +91,7 @@ export async function runPong(setup: boolean) {
 
     const POLL_INTERVAL = 16; // Approx 60fps
 
-    while (gpio.read(7)) {
+    while (running()) {
         // --- 1. Input & Update ---
         const p1Move = getJoystickDirection(P1_Y_PIN);
         const p2Move = getJoystickDirection(P2_Y_PIN);
@@ -217,3 +217,5 @@ export async function runPong(setup: boolean) {
     p2.score = 0;
     resetBall(0);
 }
+
+if (standalone()) runPong();
